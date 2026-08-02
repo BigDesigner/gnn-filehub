@@ -44,6 +44,25 @@ class FileHub_Attachment {
     }
 
     /**
+     * Get Effective Storage Quota (in Bytes) for a User
+     * Supports Per-User Custom Quota User Meta Override (_filehub_custom_quota_mb)
+     *
+     * @param int $user_id
+     * @return int Quota limit in bytes.
+     */
+    public static function get_user_quota( int $user_id ): int {
+        $custom_quota_mb = (int) get_user_meta( $user_id, '_filehub_custom_quota_mb', true );
+
+        if ( $custom_quota_mb > 0 ) {
+            return $custom_quota_mb * 1024 * 1024;
+        }
+
+        // Fallback to default 500 MB global quota
+        $default_quota_mb = (int) get_option( 'filehub_default_quota_mb', 500 );
+        return ( $default_quota_mb > 0 ? $default_quota_mb : 500 ) * 1024 * 1024;
+    }
+
+    /**
      * Get Per-User File Usage Statistics
      *
      * @param int $user_id
@@ -68,9 +87,17 @@ class FileHub_Attachment {
             $total_bytes += $size;
         }
 
+        $quota_bytes     = self::get_user_quota( $user_id );
+        $custom_quota_mb = (int) get_user_meta( $user_id, '_filehub_custom_quota_mb', true );
+
         return array(
-            'file_count'  => $total_files,
-            'total_bytes' => $total_bytes,
+            'file_count'      => $total_files,
+            'total_bytes'     => $total_bytes,
+            'quota_bytes'     => $quota_bytes,
+            'custom_quota_mb' => $custom_quota_mb,
+            'quota_formatted' => size_format( $quota_bytes ),
+            'used_formatted'  => size_format( $total_bytes ),
+            'percentage'      => $quota_bytes > 0 ? min( 100, round( ( $total_bytes / $quota_bytes ) * 100, 1 ) ) : 0,
         );
     }
 

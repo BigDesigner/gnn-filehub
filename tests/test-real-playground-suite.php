@@ -254,6 +254,67 @@ run_real_test( 'S8', 'Cloud Storage Drivers Header Signing & Class Contract', fu
     return true;
 } );
 
+// S9: Per-User Custom Storage Quota Override
+run_real_test( 'S9', 'Per-User Custom Storage Quota User Meta Override', function() {
+    $user_id = get_current_user_id() ?: 1;
+
+    // Set custom 1024 MB quota on user meta
+    update_user_meta( $user_id, '_filehub_custom_quota_mb', 1024 );
+
+    $quota_bytes = FileHub_Attachment::get_user_quota( $user_id );
+    if ( $quota_bytes !== 1024 * 1024 * 1024 ) {
+        delete_user_meta( $user_id, '_filehub_custom_quota_mb' );
+        return "Custom quota calculation mismatch. Expected 1073741824 bytes, got $quota_bytes.";
+    }
+
+    $user_stats = FileHub_Attachment::get_user_stats( $user_id );
+    if ( $user_stats['custom_quota_mb'] !== 1024 ) {
+        delete_user_meta( $user_id, '_filehub_custom_quota_mb' );
+        return "User stats custom_quota_mb mismatch.";
+    }
+
+    delete_user_meta( $user_id, '_filehub_custom_quota_mb' );
+    return true;
+} );
+
+// S10: Chunked Upload Stream Assembly & REST Endpoint Verification
+run_real_test( 'S10', 'Chunked Upload Stream Assembly & Chunk Directory Cleanup', function() {
+    $user_id = get_current_user_id() ?: 1;
+    $file_id = 'test_chunk_' . time();
+    $upload_dir = wp_upload_dir();
+    $chunks_dir = $upload_dir['basedir'] . '/filehub-protected/chunks/' . $user_id . '_' . $file_id;
+
+    wp_mkdir_p( $chunks_dir );
+
+    $part1 = $chunks_dir . '/part_0';
+    $part2 = $chunks_dir . '/part_1';
+
+    file_put_contents( $part1, 'Chunk-1-Content-' );
+    file_put_contents( $part2, 'Chunk-2-Content' );
+
+    $assembled_tmp = sys_get_temp_dir() . '/assembled_' . $user_id . '_' . $file_id . '.txt';
+    $out_stream    = fopen( $assembled_tmp, 'wb' );
+
+    for ( $i = 0; $i < 2; $i++ ) {
+        $part = $chunks_dir . '/part_' . $i;
+        $in = fopen( $part, 'rb' );
+        stream_copy_to_stream( $in, $out_stream );
+        fclose( $in );
+    }
+    fclose( $out_stream );
+
+    $content = file_get_contents( $assembled_tmp );
+    @unlink( $assembled_tmp );
+    array_map( 'unlink', glob( $chunks_dir . '/part_*' ) );
+    @rmdir( $chunks_dir );
+
+    if ( $content !== 'Chunk-1-Content-Chunk-2-Content' ) {
+        return "Assembled chunk stream content mismatch. Expected 'Chunk-1-Content-Chunk-2-Content', got '$content'.";
+    }
+
+    return true;
+} );
+
 echo "\n-----------------------------------------------------------------\n";
 echo sprintf( "REAL SUITE RESULTS: %d PASSED, %d FAILED\n", $suite_passed, $suite_failed );
 echo "-----------------------------------------------------------------\n";

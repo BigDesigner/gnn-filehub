@@ -48,7 +48,17 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     }
 
+    const CHUNK_SIZE = 2 * 1024 * 1024; // 2MB chunks
+
     function uploadFile(file) {
+      if (file.size > CHUNK_SIZE) {
+        uploadFileChunked(file);
+      } else {
+        uploadFileSingle(file);
+      }
+    }
+
+    function uploadFileSingle(file) {
       const formData = new FormData();
       formData.append('file', file);
 
@@ -93,6 +103,80 @@ document.addEventListener('DOMContentLoaded', function () {
       xhr.open('POST', filehub_vars.rest_url + 'filehub/v1/upload', true);
       xhr.setRequestHeader('X-WP-Nonce', filehub_vars.nonce);
       xhr.send(formData);
+    }
+
+    function uploadFileChunked(file) {
+      const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+      const fileId = 'file_' + Date.now() + '_' + Math.random().toString(36).substr(2, 8);
+      let currentChunk = 0;
+      const startTime = new Date().getTime();
+      let totalUploadedBytes = 0;
+
+      if (progressBar) progressBar.style.display = 'block';
+      if (statusText) statusText.textContent = `Parçalı yükleme başlatılıyor (Toplam ${totalChunks} parça)...`;
+
+      function sendNextChunk() {
+        if (currentChunk >= totalChunks) return;
+
+        const start = currentChunk * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, file.size);
+        const chunkBlob = file.slice(start, end);
+
+        const formData = new FormData();
+        formData.append('chunk', chunkBlob, file.name);
+        formData.append('file_id', fileId);
+        formData.append('chunk_index', currentChunk);
+        formData.append('total_chunks', totalChunks);
+        formData.append('filename', file.name);
+
+        const xhr = new XMLHttpRequest();
+
+        xhr.upload.addEventListener('progress', function (e) {
+          if (e.lengthComputable) {
+            const currentTotalLoaded = totalUploadedBytes + e.loaded;
+            const percent = Math.round((currentTotalLoaded / file.size) * 100);
+            const elapsedTime = (new Date().getTime() - startTime) / 1000;
+            const speedBytes = elapsedTime > 0 ? currentTotalLoaded / elapsedTime : 0;
+            const speedMB = (speedBytes / (1024 * 1024)).toFixed(2);
+
+            if (progressFill) progressFill.style.width = percent + '%';
+            if (statusText) statusText.textContent = `Parça ${currentChunk + 1}/${totalChunks} Yükleniyor: %${percent} (${speedMB} MB/s)`;
+          }
+        });
+
+        xhr.onreadystatechange = function () {
+          if (xhr.readyState === XMLHttpRequest.DONE) {
+            if (xhr.status === 200) {
+              totalUploadedBytes += (end - start);
+              currentChunk++;
+
+              if (currentChunk < totalChunks) {
+                sendNextChunk();
+              } else {
+                if (statusText) statusText.textContent = 'Tüm parçalar birleştirildi, yükleme başarılı!';
+                if (progressFill) progressFill.style.width = '100%';
+                setTimeout(() => {
+                  if (progressBar) progressBar.style.display = 'none';
+                  fetchFileList();
+                }, 1200);
+              }
+            } else {
+              try {
+                const resp = JSON.parse(xhr.responseText);
+                if (statusText) statusText.textContent = 'Hata: ' + (resp.error || 'Parça yükleme başarısız.');
+              } catch (err) {
+                if (statusText) statusText.textContent = `Parça ${currentChunk + 1} yüklenirken sunucu hatası oluştu.`;
+              }
+            }
+          }
+        };
+
+        xhr.open('POST', filehub_vars.rest_url + 'filehub/v1/upload-chunk', true);
+        xhr.setRequestHeader('X-WP-Nonce', filehub_vars.nonce);
+        xhr.send(formData);
+      }
+
+      sendNextChunk();
     }
   }
 

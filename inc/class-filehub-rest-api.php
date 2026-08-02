@@ -30,6 +30,12 @@ class FileHub_REST_API extends WP_REST_Controller {
             'permission_callback' => array( $this, 'check_upload_permission' ),
         ) );
 
+        register_rest_route( $this->namespace, '/upload-chunk', array(
+            'methods'             => WP_REST_Server::CREATABLE,
+            'callback'            => array( $this, 'handle_upload_chunk' ),
+            'permission_callback' => array( $this, 'check_upload_permission' ),
+        ) );
+
         register_rest_route( $this->namespace, '/files', array(
             'methods'             => WP_REST_Server::READABLE,
             'callback'            => array( $this, 'handle_list_files' ),
@@ -121,6 +127,139 @@ class FileHub_REST_API extends WP_REST_Controller {
         }
 
         $attachment_id = FileHub_Attachment::create_attachment( $upload_result, $user_id, $file['type'] );
+        if ( is_wp_error( $attachment_id ) ) {
+            return new WP_REST_Response( array( 'error' => $attachment_id->get_error_message() ), 500 );
+        }
+
+        return new WP_REST_Response( array(
+            'success'       => true,
+            'attachment_id' => $attachment_id,
+            'file_name'     => $upload_result['file_name'],
+            'download_url'  => rest_url( 'filehub/v1/download/' . $attachment_id ),
+        ), 200 );
+    }
+
+    /**
+     * Handle Chunked Resumable File Upload
+     */
+    public function handle_upload_chunk( $request ) {
+        $user_id = get_current_user_id() ?: 0;
+
+        // Sanitize parameters to block directory traversal & injection
+        $file_id      = preg_replace( '/[^a-zA-Z0-9_-]/', '', (string) $request->get_param( 'file_id' ) );
+        $chunk_index  = absint( $request->get_param( 'chunk_index' ) );
+        $total_chunks = absint( $request->get_param( 'total_chunks' ) );
+        $filename     = sanitize_file_name( (string) $request->get_param( 'filename' ) );
+
+        if ( empty( $file_id ) || empty( $filename ) || $total_chunks <= 0 ) {
+            return new WP_REST_Response( array( 'error' => __( 'Görünüşe göre geçersiz parça bilgileri gönderildi.', 'gnn-filehub' ) ), 400 );
+        }
+
+        // Extension Whitelist Validation
+        $allowed_exts = array_map( 'trim', explode( ',', get_option( 'filehub_allowed_extensions', 'jpg,jpeg,png,gif,pdf,zip,doc,docx,xlsx' ) ) );
+        $ext          = strtolower( pathinfo( $filename, PATHINFO_EXTENSION ) );
+        if ( ! in_array( $ext, $allowed_exts, true ) ) {
+            return new WP_REST_Response( array( 'error' => __( 'Bu dosya uzantısına izin verilmiyor.', 'gnn-filehub' ) ), 400 );
+        }
+
+        // User Quota Validation Check
+        $user_stats = FileHub_Attachment::get_user_stats( $user_id );
+        if ( $user_stats['quota_bytes'] > 0 && $user_stats['total_bytes'] >= $user_stats['quota_bytes'] ) {
+            return new WP_REST_Response( array( 'error' => __( 'Depolama kotanızı aştınız.', 'gnn-filehub' ) ), 400 );
+        }
+
+        $files = $request->get_file_params();
+        if ( empty( $files['chunk'] ) ) {
+            return new WP_REST_Response( array( 'error' => __( 'Parça verisi bulunamadı.', 'gnn-filehub' ) ), 400 );
+        }
+
+        $chunk_file = $files['chunk'];
+        $upload_dir = wp_upload_dir();
+        $chunk_dir  = $upload_dir['basedir'] . '/filehub-protected/chunks/' . $user_id . '_' . $file_id;
+
+        if ( ! file_exists( $chunk_dir ) ) {
+            wp_mkdir_p( $chunk_dir );
+        }
+
+        $part_file = $chunk_dir . '/part_' . $chunk_index;
+        if ( ! @move_uploaded_file( $chunk_file['tmp_name'], $part_file ) ) {
+            @copy( $chunk_file['tmp_name'], $part_file );
+        }
+
+        // Check if all chunks have been uploaded
+        $parts = glob( $chunk_dir . '/part_*' );
+        $parts_count = is_array( $parts ) ? count( $parts ) : 0;
+
+        if ( $parts_count < $total_chunks ) {
+            return new WP_REST_Response( array(
+                'success'     => true,
+                'chunk_index' => $chunk_index,
+                'status'      => 'chunk_saved',
+            ), 200 );
+        }
+
+        // All chunks received! Stream-merge them into temporary assembled file
+        $assembled_tmp = sys_get_temp_dir() . '/assembled_' . $user_id . '_' . $file_id . '.' . $ext;
+        $out_stream    = fopen( $assembled_tmp, 'wb' );
+
+        if ( ! $out_stream ) {
+            return new WP_REST_Response( array( 'error' => __( 'Parçalar birleştirilirken sunucu hatası oluştu.', 'gnn-filehub' ) ), 500 );
+        }
+
+        for ( $i = 0; $i < $total_chunks; $i++ ) {
+            $part_path = $chunk_dir . '/part_' . $i;
+            if ( ! file_exists( $part_path ) ) {
+                fclose( $out_stream );
+                @unlink( $assembled_tmp );
+                return new WP_REST_Response( array( 'error' => __( 'Eksik dosya parçası tespit edildi.', 'gnn-filehub' ) ), 400 );
+            }
+            $in_stream = fopen( $part_path, 'rb' );
+            if ( $in_stream ) {
+                stream_copy_to_stream( $in_stream, $out_stream );
+                fclose( $in_stream );
+            }
+        }
+        fclose( $out_stream );
+
+        // Clean up temporary chunk files
+        $part_files = glob( $chunk_dir . '/part_*' );
+        if ( is_array( $part_files ) ) {
+            array_map( 'unlink', $part_files );
+        }
+        @rmdir( $chunk_dir );
+
+        // Build file array for Storage Driver
+        $final_file_info = array(
+            'name'     => $filename,
+            'tmp_name' => $assembled_tmp,
+            'type'     => ! empty( $chunk_file['type'] ) ? $chunk_file['type'] : 'application/octet-stream',
+            'error'    => 0,
+            'size'     => filesize( $assembled_tmp ),
+        );
+
+        // Upload to Selected Storage Driver
+        $driver_name = get_option( 'filehub_storage_driver', 'local' );
+        switch ( $driver_name ) {
+            case 'r2':
+                $driver = new FileHub_Storage_R2();
+                break;
+            case 'gdrive':
+                $driver = new FileHub_Storage_GDrive();
+                break;
+            case 'local':
+            default:
+                $driver = new FileHub_Storage_Local();
+                break;
+        }
+
+        $upload_result = $driver->upload_file( $final_file_info, $user_id );
+        @unlink( $assembled_tmp );
+
+        if ( is_wp_error( $upload_result ) ) {
+            return new WP_REST_Response( array( 'error' => $upload_result->get_error_message() ), 500 );
+        }
+
+        $attachment_id = FileHub_Attachment::create_attachment( $upload_result, $user_id, $final_file_info['type'] );
         if ( is_wp_error( $attachment_id ) ) {
             return new WP_REST_Response( array( 'error' => $attachment_id->get_error_message() ), 500 );
         }

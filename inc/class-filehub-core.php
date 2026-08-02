@@ -85,6 +85,25 @@ class FileHub_Core {
         if ( ! file_exists( $index_file ) ) {
             @file_put_contents( $index_file, '' );
         }
+
+        $this->ensure_chunk_storage_dir();
+    }
+
+    /**
+     * Ensure Temporary Chunk Storage directory exists with .htaccess protection
+     */
+    public function ensure_chunk_storage_dir() {
+        $upload_dir = wp_upload_dir();
+        $chunks_dir = $upload_dir['basedir'] . '/filehub-protected/chunks';
+
+        if ( ! file_exists( $chunks_dir ) ) {
+            wp_mkdir_p( $chunks_dir );
+        }
+
+        $htaccess_file = $chunks_dir . '/.htaccess';
+        if ( ! file_exists( $htaccess_file ) ) {
+            @file_put_contents( $htaccess_file, "Deny from all\n" );
+        }
     }
 
     /**

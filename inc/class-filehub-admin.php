@@ -15,6 +15,11 @@ class FileHub_Admin {
         add_action( 'admin_menu', array( $this, 'add_admin_menu' ) );
         add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
         add_action( 'admin_init', array( $this, 'register_settings' ) );
+
+        add_action( 'show_user_profile', array( $this, 'render_user_profile_fields' ) );
+        add_action( 'edit_user_profile', array( $this, 'render_user_profile_fields' ) );
+        add_action( 'personal_options_update', array( $this, 'save_user_profile_fields' ) );
+        add_action( 'edit_user_profile_update', array( $this, 'save_user_profile_fields' ) );
     }
 
     /**
@@ -444,5 +449,59 @@ class FileHub_Admin {
             <?php submit_button( __( 'Depolama Ayarlarını Kaydet', 'gnn-filehub' ) ); ?>
         </form>
         <?php
+    }
+
+    /**
+     * Render Custom Storage Quota Field on User Profile Screen
+     *
+     * @param WP_User $user
+     */
+    public function render_user_profile_fields( $user ) {
+        if ( ! current_user_can( 'manage_options' ) && ! current_user_can( 'edit_user', $user->ID ) ) {
+            return;
+        }
+
+        $custom_quota_mb = get_user_meta( $user->ID, '_filehub_custom_quota_mb', true );
+        $user_stats      = FileHub_Attachment::get_user_stats( $user->ID );
+        wp_nonce_field( 'filehub_save_user_quota', 'filehub_user_quota_nonce' );
+        ?>
+        <h3>GNN FileHub Depolama Ayarları</h3>
+        <table class="form-table">
+            <tr>
+                <th><label for="filehub_custom_quota_mb">Özel Depolama Kotası (MB)</label></th>
+                <td>
+                    <input type="number" name="filehub_custom_quota_mb" id="filehub_custom_quota_mb" value="<?php echo esc_attr( $custom_quota_mb ); ?>" min="0" step="1" class="regular-text" />
+                    <p class="description">
+                        Bu kullanıcı için özel depolama limiti (MB). Boş bırakılırsa veya 0 yazılırsa varsayılan kota (500 MB) kullanılır.<br />
+                        <strong>Mevcut Kullanım:</strong> <?php echo esc_html( $user_stats['used_formatted'] ); ?> / <?php echo esc_html( $user_stats['quota_formatted'] ); ?> (%<?php echo esc_html( $user_stats['percentage'] ); ?>)
+                    </p>
+                </td>
+            </tr>
+        </table>
+        <?php
+    }
+
+    /**
+     * Save Custom Storage Quota Field
+     *
+     * @param int $user_id
+     */
+    public function save_user_profile_fields( $user_id ) {
+        if ( ! current_user_can( 'edit_user', $user_id ) ) {
+            return;
+        }
+
+        if ( ! isset( $_POST['filehub_user_quota_nonce'] ) || ! wp_verify_nonce( $_POST['filehub_user_quota_nonce'], 'filehub_save_user_quota' ) ) {
+            return;
+        }
+
+        if ( isset( $_POST['filehub_custom_quota_mb'] ) ) {
+            $val = sanitize_text_field( $_POST['filehub_custom_quota_mb'] );
+            if ( $val === '' || (int) $val <= 0 ) {
+                delete_user_meta( $user_id, '_filehub_custom_quota_mb' );
+            } else {
+                update_user_meta( $user_id, '_filehub_custom_quota_mb', absint( $val ) );
+            }
+        }
     }
 }
