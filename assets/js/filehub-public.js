@@ -1,4 +1,4 @@
-/* GNN FileHub NextGen - Zero Dependency Native Public Drag & Drop JS */
+/* GNN FileHub NextGen - Zero Dependency Native Public Drag & Drop, Manager & Password JS */
 document.addEventListener('DOMContentLoaded', function () {
   const dropZone = document.getElementById('filehub-dropzone');
   const fileInput = document.getElementById('filehub-file-input');
@@ -6,88 +6,95 @@ document.addEventListener('DOMContentLoaded', function () {
   const progressFill = document.getElementById('filehub-progress-fill');
   const statusText = document.getElementById('filehub-status-text');
   const fileListContainer = document.getElementById('filehub-file-list');
+  const searchInput = document.getElementById('filehub-search-input');
+  const passwordForm = document.getElementById('filehub-password-form');
+  const passwordStatus = document.getElementById('filehub-password-status');
 
-  if (!dropZone || !fileInput) return;
+  let cachedFilesData = [];
 
-  ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-    dropZone.addEventListener(eventName, preventDefaults, false);
-  });
+  // Drag & Drop File Upload
+  if (dropZone && fileInput) {
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      dropZone.addEventListener(eventName, preventDefaults, false);
+    });
 
-  function preventDefaults(e) {
-    e.preventDefault();
-    e.stopPropagation();
-  }
-
-  ['dragenter', 'dragover'].forEach(eventName => {
-    dropZone.classList.add('filehub-highlight');
-  });
-
-  ['dragleave', 'drop'].forEach(eventName => {
-    dropZone.classList.remove('filehub-highlight');
-  });
-
-  dropZone.addEventListener('drop', handleDrop, false);
-  fileInput.addEventListener('change', function () {
-    if (this.files.length > 0) {
-      uploadFile(this.files[0]);
+    function preventDefaults(e) {
+      e.preventDefault();
+      e.stopPropagation();
     }
-  });
 
-  function handleDrop(e) {
-    const dt = e.dataTransfer;
-    const files = dt.files;
-    if (files.length > 0) {
-      uploadFile(files[0]);
-    }
-  }
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropZone.classList.add('filehub-highlight');
+    });
 
-  function uploadFile(file) {
-    const formData = new FormData();
-    formData.append('file', file);
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropZone.classList.remove('filehub-highlight');
+    });
 
-    const xhr = new XMLHttpRequest();
-    const startTime = new Date().getTime();
-
-    if (progressBar) progressBar.style.display = 'block';
-    if (statusText) statusText.textContent = 'Yükleme başlatılıyor...';
-
-    xhr.upload.addEventListener('progress', function (e) {
-      if (e.lengthComputable) {
-        const percent = Math.round((e.loaded / e.total) * 100);
-        const elapsedTime = (new Date().getTime() - startTime) / 1000;
-        const speedBytes = elapsedTime > 0 ? e.loaded / elapsedTime : 0;
-        const speedMB = (speedBytes / (1024 * 1024)).toFixed(2);
-
-        if (progressFill) progressFill.style.width = percent + '%';
-        if (statusText) statusText.textContent = `Yükleniyor: %${percent} (${speedMB} MB/s)`;
+    dropZone.addEventListener('drop', handleDrop, false);
+    fileInput.addEventListener('change', function () {
+      if (this.files.length > 0) {
+        uploadFile(this.files[0]);
       }
     });
 
-    xhr.onreadystatechange = function () {
-      if (xhr.readyState === XMLHttpRequest.DONE) {
-        if (xhr.status === 200) {
-          if (statusText) statusText.textContent = 'Yükleme başarıyla tamamlandı!';
-          if (progressFill) progressFill.style.width = '100%';
-          setTimeout(() => {
-            if (progressBar) progressBar.style.display = 'none';
-            fetchFileList();
-          }, 1500);
-        } else {
-          try {
-            const resp = JSON.parse(xhr.responseText);
-            if (statusText) statusText.textContent = 'Hata: ' + (resp.error || 'Yükleme başarısız.');
-          } catch (err) {
-            if (statusText) statusText.textContent = 'Sunucu yükleme hatası.';
+    function handleDrop(e) {
+      const dt = e.dataTransfer;
+      const files = dt.files;
+      if (files.length > 0) {
+        uploadFile(files[0]);
+      }
+    }
+
+    function uploadFile(file) {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const xhr = new XMLHttpRequest();
+      const startTime = new Date().getTime();
+
+      if (progressBar) progressBar.style.display = 'block';
+      if (statusText) statusText.textContent = 'Yükleme başlatılıyor...';
+
+      xhr.upload.addEventListener('progress', function (e) {
+        if (e.lengthComputable) {
+          const percent = Math.round((e.loaded / e.total) * 100);
+          const elapsedTime = (new Date().getTime() - startTime) / 1000;
+          const speedBytes = elapsedTime > 0 ? e.loaded / elapsedTime : 0;
+          const speedMB = (speedBytes / (1024 * 1024)).toFixed(2);
+
+          if (progressFill) progressFill.style.width = percent + '%';
+          if (statusText) statusText.textContent = `Yükleniyor: %${percent} (${speedMB} MB/s)`;
+        }
+      });
+
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState === XMLHttpRequest.DONE) {
+          if (xhr.status === 200) {
+            if (statusText) statusText.textContent = 'Yükleme başarıyla tamamlandı!';
+            if (progressFill) progressFill.style.width = '100%';
+            setTimeout(() => {
+              if (progressBar) progressBar.style.display = 'none';
+              fetchFileList();
+            }, 1200);
+          } else {
+            try {
+              const resp = JSON.parse(xhr.responseText);
+              if (statusText) statusText.textContent = 'Hata: ' + (resp.error || 'Yükleme başarısız.');
+            } catch (err) {
+              if (statusText) statusText.textContent = 'Sunucu yükleme hatası.';
+            }
           }
         }
-      }
-    };
+      };
 
-    xhr.open('POST', filehub_vars.rest_url + 'filehub/v1/upload', true);
-    xhr.setRequestHeader('X-WP-Nonce', filehub_vars.nonce);
-    xhr.send(formData);
+      xhr.open('POST', filehub_vars.rest_url + 'filehub/v1/upload', true);
+      xhr.setRequestHeader('X-WP-Nonce', filehub_vars.nonce);
+      xhr.send(formData);
+    }
   }
 
+  // File Manager & Live Search
   function fetchFileList() {
     if (!fileListContainer) return;
     fetch(filehub_vars.rest_url + 'filehub/v1/files', {
@@ -98,25 +105,123 @@ document.addEventListener('DOMContentLoaded', function () {
       .then(res => res.json())
       .then(data => {
         if (!Array.isArray(data)) return;
-        let html = '<table class="widefat striped"><thead><tr><th>Dosya Adı</th><th>Boyut</th><th>Sürücü</th><th>Yükleyen</th><th>İndirme</th><th>İşlem</th></tr></thead><tbody>';
-        if (data.length === 0) {
-          html += '<tr><td colspan="6">Henüz dosya yüklenmedi.</td></tr>';
-        } else {
-          data.forEach(item => {
-            html += `<tr>
-              <td><strong>${item.title}</strong></td>
-              <td>${item.file_size}</td>
-              <td><span class="filehub-driver-badge">${item.driver}</span></td>
-              <td>${item.author_name}</td>
-              <td>${item.download_count}</td>
-              <td><a href="${item.download_url}" class="button button-secondary button-small" target="_blank">İndir</a></td>
-            </tr>`;
-          });
-        }
-        html += '</tbody></table>';
-        fileListContainer.innerHTML = html;
+        cachedFilesData = data;
+        renderFileList(cachedFilesData);
       })
       .catch(err => console.error(err));
+  }
+
+  function renderFileList(items) {
+    if (!fileListContainer) return;
+    let html = '<table class="widefat striped"><thead><tr><th>Dosya Adı</th><th>Boyut</th><th>Sürücü</th><th>Yükleyen</th><th>İndirme</th><th>İşlem</th></tr></thead><tbody>';
+    if (items.length === 0) {
+      html += '<tr><td colspan="6" style="text-align:center; padding: 20px;">Dosya bulunamadı.</td></tr>';
+    } else {
+      items.forEach(item => {
+        const deleteBtn = item.can_delete ? `<button type="button" class="button button-link-delete button-small filehub-delete-btn" data-id="${item.id}" style="color:#b32d2e; margin-left:8px;">Sil</button>` : '';
+        html += `<tr>
+          <td><strong>${escapeHtml(item.title)}</strong></td>
+          <td>${item.file_size}</td>
+          <td><span class="filehub-driver-badge">${item.driver}</span></td>
+          <td>${escapeHtml(item.author_name)}</td>
+          <td>${item.download_count}</td>
+          <td>
+            <a href="${item.download_url}" class="button button-secondary button-small" target="_blank">İndir</a>
+            ${deleteBtn}
+          </td>
+        </tr>`;
+      });
+    }
+    html += '</tbody></table>';
+    fileListContainer.innerHTML = html;
+
+    // Attach Delete Event Listeners
+    document.querySelectorAll('.filehub-delete-btn').forEach(btn => {
+      btn.addEventListener('click', function () {
+        const fileId = this.getAttribute('data-id');
+        if (confirm('Bu dosyayı kalıcı olarak silmek istediğinizden emin misiniz?')) {
+          deleteFile(fileId);
+        }
+      });
+    });
+  }
+
+  function deleteFile(fileId) {
+    fetch(filehub_vars.rest_url + 'filehub/v1/files/' + fileId, {
+      method: 'DELETE',
+      headers: {
+        'X-WP-Nonce': filehub_vars.nonce
+      }
+    })
+      .then(res => res.json())
+      .then(resp => {
+        if (resp.success) {
+          fetchFileList();
+        } else {
+          alert(resp.error || 'Silme işlemi başarısız.');
+        }
+      })
+      .catch(err => alert('Sunucu bağlantı hatası.'));
+  }
+
+  if (searchInput) {
+    searchInput.addEventListener('input', function () {
+      const term = this.value.toLowerCase().trim();
+      const filtered = cachedFilesData.filter(item =>
+        item.title.toLowerCase().includes(term) || item.author_name.toLowerCase().includes(term)
+      );
+      renderFileList(filtered);
+    });
+  }
+
+  // Front-End Password Change Handler
+  if (passwordForm) {
+    passwordForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      const current_password = document.getElementById('filehub_current_password').value;
+      const new_password = document.getElementById('filehub_new_password').value;
+      const confirm_password = document.getElementById('filehub_confirm_password').value;
+
+      if (passwordStatus) passwordStatus.textContent = 'Şifre güncelleniyor...';
+
+      fetch(filehub_vars.rest_url + 'filehub/v1/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-WP-Nonce': filehub_vars.nonce
+        },
+        body: JSON.stringify({
+          current_password: current_password,
+          new_password: new_password,
+          confirm_password: confirm_password
+        })
+      })
+        .then(res => res.json())
+        .then(resp => {
+          if (resp.success) {
+            if (passwordStatus) {
+              passwordStatus.style.color = '#00a32a';
+              passwordStatus.textContent = resp.message;
+            }
+            passwordForm.reset();
+          } else {
+            if (passwordStatus) {
+              passwordStatus.style.color = '#b32d2e';
+              passwordStatus.textContent = resp.error || 'Güncelleme başarısız.';
+            }
+          }
+        })
+        .catch(err => {
+          if (passwordStatus) {
+            passwordStatus.style.color = '#b32d2e';
+            passwordStatus.textContent = 'Sunucu bağlantı hatası.';
+          }
+        });
+    });
+  }
+
+  function escapeHtml(str) {
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
   fetchFileList();

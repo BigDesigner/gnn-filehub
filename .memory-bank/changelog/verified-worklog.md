@@ -9,7 +9,8 @@
 - **2026-08-02:** **Task 4 Completed:** Created `inc/class-filehub-attachment.php` and `inc/class-filehub-rest-api.php`.
 - **2026-08-02:** **Task 5 Completed:** Created `inc/class-filehub-admin.php` and `assets/css/filehub-admin.css`.
 - **2026-08-02:** **Task 6 Completed:** Created `inc/class-filehub-shortcodes.php` and `assets/js/filehub-public.js`.
-- **2026-08-02:** **Task 7 Completed:** Created GitHub Auto-Updater (`inc/class-filehub-updater.php`) with 12h transient caching, WP Core Update pipeline hooks, manual update check, and updated `.github/workflows/release.yml` with optional `version_override` input.
+- **2026-08-02:** **Task 7 Completed:** Created GitHub Auto-Updater (`inc/class-filehub-updater.php`) and `.github/workflows/release.yml`.
+- **2026-08-02:** **Task 8 Completed:** Added `[filehub_login]`, `[filehub_profile]`, `[filehub_password_change]` shortcodes and added Live Search & AJAX Delete functionality to `[filehub_manager]`.
 
 ## Validation Status
 - All 11 PHP files syntax checked via `php -l` -> 100% Passed cleanly with 0 errors.

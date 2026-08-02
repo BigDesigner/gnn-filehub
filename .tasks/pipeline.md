@@ -1,6 +1,6 @@
 # Project Sprint Pipeline
 
-## Current Sprint: v0.1.0-alpha (Greenfield Plugin & GitHub Auto-Updater Complete)
+## Current Sprint: v0.2.0-alpha (Front-End User Screens & Live Manager Features Complete)
 
 ### 📌 Active Tasks
 - [x] **Task 1: Plugin Bootstrap & Core Class** (`gnn-filehub-nextgen.php`, `inc/class-filehub-core.php`) [Verified]
@@ -10,11 +10,12 @@
 - [x] **Task 5: Admin Dashboard UI & Pure CSS Toggles** (`inc/class-filehub-admin.php`, `assets/css/filehub-admin.css`) [Verified]
 - [x] **Task 6: Shortcodes & Public Drag-and-Drop Uploader** (`inc/class-filehub-shortcodes.php`, `assets/js/filehub-public.js`) [Verified]
 - [x] **Task 7: GitHub Automatic Update Checker & CI Release Builder** (`inc/class-filehub-updater.php`, `.github/workflows/release.yml`) [Verified]
+- [x] **Task 8: Front-End Screens (Login, Profile, Password Change, Live Search & AJAX Delete)** (`inc/class-filehub-shortcodes.php`, `assets/js/filehub-public.js`, `inc/class-filehub-rest-api.php`) [Verified]
 
 ### 📋 Backlog
 - Chunked / Resumable upload handler for multi-gigabyte files.
-- Per-user storage quota enforcement and visual alerts.
+- Per-user custom quota override setting in WP Admin user profile.
 
 ### 🚦 Release Readiness
-- Status: 100% Complete & Verified (`php -l` passed on 11/11 PHP files)
-- Next Step: Commit GitHub Auto-Updater feature.
+- Status: 100% Complete & Verified (`php -l` passed on all 11 PHP files)
+- Next Step: Commit v0.2.0-alpha release.

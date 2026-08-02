@@ -10,7 +10,7 @@ require_once GNN_FILEHUB_PATH . 'inc/class-filehub-attachment.php';
 
 /**
  * Class FileHub_REST_API
- * Secure WP REST Controller for upload, list, delete, and download operations.
+ * Secure WP REST Controller for upload, list, delete, download, and password operations.
  */
 class FileHub_REST_API extends WP_REST_Controller {
 
@@ -46,6 +46,12 @@ class FileHub_REST_API extends WP_REST_Controller {
             'methods'             => WP_REST_Server::READABLE,
             'callback'            => array( $this, 'handle_download_file' ),
             'permission_callback' => '__return_true', // Download URL checked inside handler
+        ) );
+
+        register_rest_route( $this->namespace, '/change-password', array(
+            'methods'             => WP_REST_Server::CREATABLE,
+            'callback'            => array( $this, 'handle_change_password' ),
+            'permission_callback' => array( $this, 'check_user_permission' ),
         ) );
     }
 
@@ -131,7 +137,7 @@ class FileHub_REST_API extends WP_REST_Controller {
         $query_args = array(
             'post_type'      => 'attachment',
             'post_status'    => 'inherit',
-            'posts_per_page' => 50,
+            'posts_per_page' => 100,
             'meta_key'       => '_filehub_storage_driver',
         );
 
@@ -143,11 +149,13 @@ class FileHub_REST_API extends WP_REST_Controller {
         $data        = array();
 
         foreach ( $attachments as $post ) {
-            $att_id   = $post->ID;
-            $driver   = get_post_meta( $att_id, '_filehub_storage_driver', true );
-            $size     = (int) get_post_meta( $att_id, '_filehub_file_size', true );
+            $att_id    = $post->ID;
+            $driver    = get_post_meta( $att_id, '_filehub_storage_driver', true );
+            $size      = (int) get_post_meta( $att_id, '_filehub_file_size', true );
             $downloads = (int) get_post_meta( $att_id, '_filehub_download_count', true );
-            $author   = get_userdata( $post->post_author );
+            $author    = get_userdata( $post->post_author );
+
+            $can_delete = $is_admin || ( (int) $post->post_author === $current_user_id );
 
             $data[] = array(
                 'id'             => $att_id,
@@ -159,6 +167,7 @@ class FileHub_REST_API extends WP_REST_Controller {
                 'author_name'    => $author ? $author->display_name : 'Guest',
                 'created_at'     => get_the_date( 'Y-m-d H:i', $att_id ),
                 'download_url'   => rest_url( 'filehub/v1/download/' . $att_id ),
+                'can_delete'     => $can_delete,
             );
         }
 
@@ -203,7 +212,7 @@ class FileHub_REST_API extends WP_REST_Controller {
 
         wp_delete_attachment( $attachment_id, true );
 
-        return new WP_REST_Response( array( 'success' => true ), 200 );
+        return new WP_REST_Response( array( 'success' => true, 'message' => __( 'Dosya başarıyla silindi.', 'gnn-filehub' ) ), 200 );
     }
 
     /**
@@ -237,5 +246,38 @@ class FileHub_REST_API extends WP_REST_Controller {
         }
 
         $driver->get_download_stream( $storage_key, $post->post_mime_type, get_the_title( $post->ID ) );
+    }
+
+    /**
+     * Handle Change Password via REST
+     */
+    public function handle_change_password( $request ) {
+        $params           = $request->get_json_params();
+        $current_password = isset( $params['current_password'] ) ? $params['current_password'] : '';
+        $new_password     = isset( $params['new_password'] ) ? $params['new_password'] : '';
+        $confirm_password = isset( $params['confirm_password'] ) ? $params['confirm_password'] : '';
+
+        if ( empty( $current_password ) || empty( $new_password ) || empty( $confirm_password ) ) {
+            return new WP_REST_Response( array( 'error' => __( 'Lütfen tüm şifre alanlarını doldurun.', 'gnn-filehub' ) ), 400 );
+        }
+
+        if ( $new_password !== $confirm_password ) {
+            return new WP_REST_Response( array( 'error' => __( 'Yeni şifreler birbiriyle eşleşmiyor.', 'gnn-filehub' ) ), 400 );
+        }
+
+        if ( strlen( $new_password ) < 6 ) {
+            return new WP_REST_Response( array( 'error' => __( 'Şifre en az 6 karakter olmalıdır.', 'gnn-filehub' ) ), 400 );
+        }
+
+        $user = wp_get_current_user();
+        if ( ! wp_check_password( $current_password, $user->user_pass, $user->ID ) ) {
+            return new WP_REST_Response( array( 'error' => __( 'Mevcut şifreniz yanlış.', 'gnn-filehub' ) ), 400 );
+        }
+
+        wp_set_password( $new_password, $user->ID );
+        wp_set_current_user( $user->ID );
+        wp_set_auth_cookie( $user->ID );
+
+        return new WP_REST_Response( array( 'success' => true, 'message' => __( 'Şifreniz başarıyla güncellendi.', 'gnn-filehub' ) ), 200 );
     }
 }
