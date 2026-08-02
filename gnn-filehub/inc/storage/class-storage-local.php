@@ -28,8 +28,20 @@ class FileHub_Storage_Local implements FileHub_Storage_Interface {
      * @return array|WP_Error
      */
     public function upload_file( array $file, int $user_id ) {
-        if ( empty( $file['tmp_name'] ) || ! is_uploaded_file( $file['tmp_name'] ) ) {
-            return new WP_Error( 'filehub_invalid_upload', __( 'geçersiz dosya yükleme isteği.', 'gnn-filehub' ) );
+        $tmp_name = ! empty( $file['tmp_name'] ) ? $file['tmp_name'] : '';
+
+        // Single-shot uploads arrive as a genuine PHP upload (is_uploaded_file() is true).
+        // Chunked uploads are merged server-side beforehand into a temp file we created
+        // ourselves in sys_get_temp_dir() (see FileHub_REST_API::merge_uploaded_chunks()),
+        // so it will never pass is_uploaded_file() — accept it instead by confirming it
+        // really does live inside the system temp directory, not an arbitrary path.
+        $is_real_upload   = $tmp_name && is_uploaded_file( $tmp_name );
+        $real_tmp_dir     = realpath( sys_get_temp_dir() );
+        $real_tmp_name    = $tmp_name ? realpath( $tmp_name ) : false;
+        $is_assembled_tmp = ! $is_real_upload && $real_tmp_name && $real_tmp_dir && 0 === strpos( $real_tmp_name, $real_tmp_dir );
+
+        if ( ! $is_real_upload && ! $is_assembled_tmp ) {
+            return new WP_Error( 'filehub_invalid_upload', __( 'Geçersiz dosya yükleme isteği.', 'gnn-filehub' ) );
         }
 
         $base_dir = $this->get_protected_base_dir();
@@ -55,7 +67,19 @@ class FileHub_Storage_Local implements FileHub_Storage_Interface {
             $counter++;
         }
 
-        if ( ! move_uploaded_file( $file['tmp_name'], $target_path ) ) {
+        if ( $is_real_upload ) {
+            $moved = move_uploaded_file( $tmp_name, $target_path );
+        } else {
+            $moved = @rename( $tmp_name, $target_path );
+            if ( ! $moved ) {
+                $moved = @copy( $tmp_name, $target_path );
+                if ( $moved ) {
+                    @unlink( $tmp_name );
+                }
+            }
+        }
+
+        if ( ! $moved ) {
             return new WP_Error( 'filehub_move_failed', __( 'Dosya korumalı dizine taşınamadı.', 'gnn-filehub' ) );
         }
 

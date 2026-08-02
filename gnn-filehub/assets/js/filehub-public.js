@@ -107,7 +107,7 @@ document.addEventListener('DOMContentLoaded', function () {
     dropZone.addEventListener('drop', handleDrop, false);
     fileInput.addEventListener('change', function () {
       if (this.files.length > 0) {
-        uploadFile(this.files[0]);
+        uploadFileQueue(this.files);
       }
     });
 
@@ -115,29 +115,59 @@ document.addEventListener('DOMContentLoaded', function () {
       const dt = e.dataTransfer;
       const files = dt.files;
       if (files.length > 0) {
-        uploadFile(files[0]);
+        uploadFileQueue(files);
       }
     }
 
-    const CHUNK_SIZE = 2 * 1024 * 1024; // 2MB chunks
+    const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks — fewer round-trips than 2MB without
+                                         // risking common low upload_max_filesize limits
+    const CHUNK_CONCURRENCY = 3; // upload several chunks at once to hide per-request
+                                  // WordPress bootstrap overhead behind network latency
 
-    function uploadFile(file) {
-      if (file.size > CHUNK_SIZE) {
-        uploadFileChunked(file);
-      } else {
-        uploadFileSingle(file);
+    // Uploads every selected/dropped file one after another (sequential, not parallel),
+    // so the server and the progress bar only ever deal with one upload at a time.
+    function uploadFileQueue(fileList) {
+      const files = Array.from(fileList);
+      let index = 0;
+
+      if (progressBar) progressBar.style.display = 'block';
+
+      function uploadNext() {
+        if (index >= files.length) {
+          if (statusText) statusText.textContent = `${files.length} dosya başarıyla yüklendi!`;
+          setTimeout(() => {
+            if (progressBar) progressBar.style.display = 'none';
+            refreshAllFileLists();
+          }, 1200);
+          return;
+        }
+
+        const file = files[index];
+        const position = ++index; // 1-based for display
+        const label = files.length > 1 ? `(${position}/${files.length}) ${file.name}: ` : '';
+
+        const onSettled = function () {
+          uploadNext();
+        };
+
+        if (file.size > CHUNK_SIZE) {
+          uploadFileChunked(file, label, onSettled);
+        } else {
+          uploadFileSingle(file, label, onSettled);
+        }
       }
+
+      uploadNext();
     }
 
-    function uploadFileSingle(file) {
+    function uploadFileSingle(file, label, onSettled) {
       const formData = new FormData();
       formData.append('file', file);
 
       const xhr = new XMLHttpRequest();
       const startTime = new Date().getTime();
 
-      if (progressBar) progressBar.style.display = 'block';
-      if (statusText) statusText.textContent = 'Yükleme başlatılıyor...';
+      if (statusText) statusText.textContent = label + 'Yükleme başlatılıyor...';
 
       xhr.upload.addEventListener('progress', function (e) {
         if (e.lengthComputable) {
@@ -147,27 +177,24 @@ document.addEventListener('DOMContentLoaded', function () {
           const speedMB = (speedBytes / (1024 * 1024)).toFixed(2);
 
           if (progressFill) progressFill.style.width = percent + '%';
-          if (statusText) statusText.textContent = `Yükleniyor: %${percent} (${speedMB} MB/s)`;
+          if (statusText) statusText.textContent = `${label}Yükleniyor: %${percent} (${speedMB} MB/s)`;
         }
       });
 
       xhr.onreadystatechange = function () {
         if (xhr.readyState === XMLHttpRequest.DONE) {
           if (xhr.status === 200) {
-            if (statusText) statusText.textContent = 'Yükleme başarıyla tamamlandı!';
+            if (statusText) statusText.textContent = label + 'Yükleme başarıyla tamamlandı!';
             if (progressFill) progressFill.style.width = '100%';
-            setTimeout(() => {
-              if (progressBar) progressBar.style.display = 'none';
-              refreshAllFileLists();
-            }, 1200);
           } else {
             try {
               const resp = JSON.parse(xhr.responseText);
-              if (statusText) statusText.textContent = 'Hata: ' + (resp.error || 'Yükleme başarısız.');
+              if (statusText) statusText.textContent = label + 'Hata: ' + (resp.error || 'Yükleme başarısız.');
             } catch (err) {
-              if (statusText) statusText.textContent = 'Sunucu yükleme hatası.';
+              if (statusText) statusText.textContent = label + 'Sunucu yükleme hatası.';
             }
           }
+          onSettled();
         }
       };
 
@@ -176,78 +203,108 @@ document.addEventListener('DOMContentLoaded', function () {
       xhr.send(formData);
     }
 
-    function uploadFileChunked(file) {
+    // Uploads a large file's chunks with limited concurrency instead of one-at-a-time:
+    // each chunk is still its own request (server assembles them by index once all have
+    // arrived), but sending several in parallel hides most of the per-request WordPress
+    // bootstrap/auth overhead behind network latency instead of paying it chunk-by-chunk.
+    function uploadFileChunked(file, label, onSettled) {
       const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
       const fileId = 'file_' + Date.now() + '_' + Math.random().toString(36).substr(2, 8);
-      let currentChunk = 0;
       const startTime = new Date().getTime();
-      let totalUploadedBytes = 0;
+      const chunkLoadedBytes = new Array(totalChunks).fill(0);
 
-      if (progressBar) progressBar.style.display = 'block';
-      if (statusText) statusText.textContent = `Parçalı yükleme başlatılıyor (Toplam ${totalChunks} parça)...`;
+      let nextChunkIndex = 0;
+      let failed = false;
+      let failMessage = '';
 
-      function sendNextChunk() {
-        if (currentChunk >= totalChunks) return;
-
-        const start = currentChunk * CHUNK_SIZE;
-        const end = Math.min(start + CHUNK_SIZE, file.size);
-        const chunkBlob = file.slice(start, end);
-
-        const formData = new FormData();
-        formData.append('chunk', chunkBlob, file.name);
-        formData.append('file_id', fileId);
-        formData.append('chunk_index', currentChunk);
-        formData.append('total_chunks', totalChunks);
-        formData.append('filename', file.name);
-
-        const xhr = new XMLHttpRequest();
-
-        xhr.upload.addEventListener('progress', function (e) {
-          if (e.lengthComputable) {
-            const currentTotalLoaded = totalUploadedBytes + e.loaded;
-            const percent = Math.round((currentTotalLoaded / file.size) * 100);
-            const elapsedTime = (new Date().getTime() - startTime) / 1000;
-            const speedBytes = elapsedTime > 0 ? currentTotalLoaded / elapsedTime : 0;
-            const speedMB = (speedBytes / (1024 * 1024)).toFixed(2);
-
-            if (progressFill) progressFill.style.width = percent + '%';
-            if (statusText) statusText.textContent = `Parça ${currentChunk + 1}/${totalChunks} Yükleniyor: %${percent} (${speedMB} MB/s)`;
-          }
-        });
-
-        xhr.onreadystatechange = function () {
-          if (xhr.readyState === XMLHttpRequest.DONE) {
-            if (xhr.status === 200) {
-              totalUploadedBytes += (end - start);
-              currentChunk++;
-
-              if (currentChunk < totalChunks) {
-                sendNextChunk();
-              } else {
-                if (statusText) statusText.textContent = 'Tüm parçalar birleştirildi, yükleme başarılı!';
-                if (progressFill) progressFill.style.width = '100%';
-                setTimeout(() => {
-                  if (progressBar) progressBar.style.display = 'none';
-                  refreshAllFileLists();
-                }, 1200);
-              }
-            } else {
-              try {
-                const resp = JSON.parse(xhr.responseText);
-                if (statusText) statusText.textContent = 'Hata: ' + (resp.error || 'Parça yükleme başarısız.');
-              } catch (err) {
-                if (statusText) statusText.textContent = `Parça ${currentChunk + 1} yüklenirken sunucu hatası oluştu.`;
-              }
-            }
-          }
-        };
-
-        xhr.open('POST', filehub_vars.rest_url + 'filehub/v1/upload-chunk', true);
-        xhr.setRequestHeader('X-WP-Nonce', filehub_vars.nonce);
-        xhr.send(formData);
+      if (statusText) {
+        statusText.textContent = `${label}Parçalı yükleme başlatılıyor (Toplam ${totalChunks} parça)...`;
       }
 
-      sendNextChunk();
+      function totalLoaded() {
+        return chunkLoadedBytes.reduce((sum, n) => sum + n, 0);
+      }
+
+      function updateProgress() {
+        const loaded = totalLoaded();
+        const percent = Math.min(100, Math.round((loaded / file.size) * 100));
+        const elapsedTime = (new Date().getTime() - startTime) / 1000;
+        const speedBytes = elapsedTime > 0 ? loaded / elapsedTime : 0;
+        const speedMB = (speedBytes / (1024 * 1024)).toFixed(2);
+
+        if (progressFill) progressFill.style.width = percent + '%';
+        if (statusText) statusText.textContent = `${label}Yükleniyor: %${percent} (${speedMB} MB/s)`;
+      }
+
+      function sendChunk(chunkIndex) {
+        return new Promise(function (resolve) {
+          const start = chunkIndex * CHUNK_SIZE;
+          const end = Math.min(start + CHUNK_SIZE, file.size);
+          const chunkBlob = file.slice(start, end);
+
+          const formData = new FormData();
+          formData.append('chunk', chunkBlob, file.name);
+          formData.append('file_id', fileId);
+          formData.append('chunk_index', chunkIndex);
+          formData.append('total_chunks', totalChunks);
+          formData.append('filename', file.name);
+
+          const xhr = new XMLHttpRequest();
+
+          xhr.upload.addEventListener('progress', function (e) {
+            if (e.lengthComputable) {
+              chunkLoadedBytes[chunkIndex] = e.loaded;
+              updateProgress();
+            }
+          });
+
+          xhr.onreadystatechange = function () {
+            if (xhr.readyState === XMLHttpRequest.DONE) {
+              if (xhr.status === 200) {
+                chunkLoadedBytes[chunkIndex] = end - start;
+                updateProgress();
+              } else if (!failed) {
+                failed = true;
+                try {
+                  const resp = JSON.parse(xhr.responseText);
+                  failMessage = resp.error || 'Parça yükleme başarısız.';
+                } catch (err) {
+                  failMessage = `Parça ${chunkIndex + 1} yüklenirken sunucu hatası oluştu.`;
+                }
+              }
+              resolve();
+            }
+          };
+
+          xhr.open('POST', filehub_vars.rest_url + 'filehub/v1/upload-chunk', true);
+          xhr.setRequestHeader('X-WP-Nonce', filehub_vars.nonce);
+          xhr.send(formData);
+        });
+      }
+
+      function worker() {
+        if (nextChunkIndex >= totalChunks) {
+          return Promise.resolve();
+        }
+        const chunkIndex = nextChunkIndex++;
+        return sendChunk(chunkIndex).then(worker);
+      }
+
+      const workerCount = Math.min(CHUNK_CONCURRENCY, totalChunks);
+      const workers = [];
+      for (let i = 0; i < workerCount; i++) {
+        workers.push(worker());
+      }
+
+      Promise.all(workers).then(function () {
+        if (failed) {
+          if (statusText) statusText.textContent = label + 'Hata: ' + failMessage;
+        } else {
+          if (statusText) statusText.textContent = label + 'Tüm parçalar birleştirildi, yükleme başarılı!';
+          if (progressFill) progressFill.style.width = '100%';
+        }
+        onSettled();
+      });
     }
   }
 

@@ -16,6 +16,8 @@ class FileHub_Admin {
         add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
         add_action( 'admin_init', array( $this, 'register_settings' ) );
         add_action( 'admin_init', array( $this, 'maybe_create_missing_pages' ) );
+        add_action( 'admin_init', array( $this, 'handle_export_settings' ) );
+        add_action( 'admin_init', array( $this, 'handle_import_settings' ) );
 
         add_action( 'show_user_profile', array( $this, 'render_user_profile_fields' ) );
         add_action( 'edit_user_profile', array( $this, 'render_user_profile_fields' ) );
@@ -25,6 +27,9 @@ class FileHub_Admin {
 
     /**
      * Add Plugin Admin Menus
+     * Genel Bakış, Tüm Dosyalar & Ayarlar are three distinct pages — the settings tabs
+     * (Genel & Güvenlik / Otomatik Sayfa Atamaları / Depolama Sürücüleri) only ever live
+     * under "Ayarlar", since Overview and All Files aren't configuration screens.
      */
     public function add_admin_menu() {
         add_menu_page(
@@ -32,7 +37,7 @@ class FileHub_Admin {
             'FileHub',
             'manage_options',
             'filehub',
-            array( $this, 'render_admin_page' ),
+            array( $this, 'render_overview_page' ),
             'dashicons-cloud-upload',
             '79.103'
         );
@@ -43,7 +48,16 @@ class FileHub_Admin {
             __( 'Genel Bakış', 'gnn-filehub' ),
             'manage_options',
             'filehub',
-            array( $this, 'render_admin_page' )
+            array( $this, 'render_overview_page' )
+        );
+
+        add_submenu_page(
+            'filehub',
+            __( 'FileHub - Tüm Dosyalar', 'gnn-filehub' ),
+            __( 'Tüm Dosyalar', 'gnn-filehub' ),
+            'manage_options',
+            'filehub-files',
+            array( $this, 'render_files_page' )
         );
 
         add_submenu_page(
@@ -52,7 +66,7 @@ class FileHub_Admin {
             __( 'Ayarlar', 'gnn-filehub' ),
             'manage_options',
             'filehub-settings',
-            array( $this, 'render_admin_page' )
+            array( $this, 'render_settings_page' )
         );
     }
 
@@ -71,7 +85,7 @@ class FileHub_Admin {
             GNN_FILEHUB_VERSION
         );
 
-        if ( isset( $_GET['tab'] ) && 'files' === $_GET['tab'] ) {
+        if ( isset( $_GET['page'] ) && 'filehub-files' === $_GET['page'] ) {
             wp_enqueue_style(
                 'filehub-public-css',
                 GNN_FILEHUB_URL . 'assets/css/filehub-public.css',
@@ -105,9 +119,7 @@ class FileHub_Admin {
         register_setting( 'filehub_general_group', 'filehub_allowed_extensions' );
 
         // Automatic Page Assignments
-        register_setting( 'filehub_pages_group', 'filehub_page_register' );
-        register_setting( 'filehub_pages_group', 'filehub_page_login' );
-        register_setting( 'filehub_pages_group', 'filehub_page_profile' );
+        register_setting( 'filehub_pages_group', 'filehub_page_account' );
         register_setting( 'filehub_pages_group', 'filehub_page_uploader' );
         register_setting( 'filehub_pages_group', 'filehub_page_manager' );
         register_setting( 'filehub_pages_group', 'filehub_page_admin_files' );
@@ -125,53 +137,71 @@ class FileHub_Admin {
     }
 
     /**
-     * Master Render Handler for Tabbed Interface
+     * Page: Genel Bakış (Overview & Analytics) — standalone, no settings tabs
      */
-    public function render_admin_page() {
-        $active_tab = isset( $_GET['tab'] ) ? sanitize_text_field( $_GET['tab'] ) : 'overview';
-        if ( isset( $_GET['page'] ) && $_GET['page'] === 'filehub-settings' && ! isset( $_GET['tab'] ) ) {
-            $active_tab = 'general';
-        }
+    public function render_overview_page() {
         ?>
         <div class="wrap">
             <h1 class="wp-heading-inline">GNN Filehub</h1>
             <hr class="wp-header-end">
+            <?php $this->render_tab_overview(); ?>
+        </div>
+        <?php
+    }
+
+    /**
+     * Page: Tüm Dosyalar (All Members' Files) — standalone, no settings tabs
+     */
+    public function render_files_page() {
+        ?>
+        <div class="wrap">
+            <h1 class="wp-heading-inline">GNN Filehub — <?php esc_html_e( 'Tüm Dosyalar', 'gnn-filehub' ); ?></h1>
+            <hr class="wp-header-end">
+            <?php $this->render_tab_files(); ?>
+        </div>
+        <?php
+    }
+
+    /**
+     * Page: Ayarlar — the only page with a tab bar (Genel & Güvenlik / Otomatik Sayfa
+     * Atamaları / Depolama Sürücüleri), since those three are the actual configuration screens.
+     */
+    public function render_settings_page() {
+        $active_tab = isset( $_GET['tab'] ) ? sanitize_text_field( $_GET['tab'] ) : 'general';
+        ?>
+        <div class="wrap">
+            <h1 class="wp-heading-inline">GNN Filehub — <?php esc_html_e( 'Ayarlar', 'gnn-filehub' ); ?></h1>
+            <hr class="wp-header-end">
 
             <nav class="nav-tab-wrapper filehub-nav-tab-wrapper">
-                <a href="?page=filehub&tab=overview" class="nav-tab <?php echo $active_tab === 'overview' ? 'nav-tab-active' : ''; ?>">
-                    <span class="dashicons dashicons-dashboard" style="vertical-align: text-bottom;"></span> <?php esc_html_e( 'Genel Bakış & Analiz', 'gnn-filehub' ); ?>
-                </a>
-                <a href="?page=filehub&tab=general" class="nav-tab <?php echo $active_tab === 'general' ? 'nav-tab-active' : ''; ?>">
+                <a href="?page=filehub-settings&tab=general" class="nav-tab <?php echo $active_tab === 'general' ? 'nav-tab-active' : ''; ?>">
                     <span class="dashicons dashicons-admin-settings" style="vertical-align: text-bottom;"></span> <?php esc_html_e( 'Genel & Güvenlik', 'gnn-filehub' ); ?>
                 </a>
-                <a href="?page=filehub&tab=pages" class="nav-tab <?php echo $active_tab === 'pages' ? 'nav-tab-active' : ''; ?>">
+                <a href="?page=filehub-settings&tab=pages" class="nav-tab <?php echo $active_tab === 'pages' ? 'nav-tab-active' : ''; ?>">
                     <span class="dashicons dashicons-admin-page" style="vertical-align: text-bottom;"></span> <?php esc_html_e( 'Otomatik Sayfa Atamaları', 'gnn-filehub' ); ?>
                 </a>
-                <a href="?page=filehub&tab=storage" class="nav-tab <?php echo $active_tab === 'storage' ? 'nav-tab-active' : ''; ?>">
+                <a href="?page=filehub-settings&tab=storage" class="nav-tab <?php echo $active_tab === 'storage' ? 'nav-tab-active' : ''; ?>">
                     <span class="dashicons dashicons-cloud-upload" style="vertical-align: text-bottom;"></span> <?php esc_html_e( 'Depolama Sürücüleri', 'gnn-filehub' ); ?>
                 </a>
-                <a href="?page=filehub&tab=files" class="nav-tab <?php echo $active_tab === 'files' ? 'nav-tab-active' : ''; ?>">
-                    <span class="dashicons dashicons-media-default" style="vertical-align: text-bottom;"></span> <?php esc_html_e( 'Tüm Dosyalar', 'gnn-filehub' ); ?>
+                <a href="?page=filehub-settings&tab=maintenance" class="nav-tab <?php echo $active_tab === 'maintenance' ? 'nav-tab-active' : ''; ?>">
+                    <span class="dashicons dashicons-admin-tools" style="vertical-align: text-bottom;"></span> <?php esc_html_e( 'Bakım', 'gnn-filehub' ); ?>
                 </a>
             </nav>
 
             <?php
             switch ( $active_tab ) {
-                case 'general':
-                    $this->render_tab_general();
-                    break;
                 case 'pages':
                     $this->render_tab_pages();
                     break;
                 case 'storage':
                     $this->render_tab_storage();
                     break;
-                case 'files':
-                    $this->render_tab_files();
+                case 'maintenance':
+                    $this->render_tab_maintenance();
                     break;
-                case 'overview':
+                case 'general':
                 default:
-                    $this->render_tab_overview();
+                    $this->render_tab_general();
                     break;
             }
             ?>
@@ -180,7 +210,7 @@ class FileHub_Admin {
     }
 
     /**
-     * Tab 1: Overview & Analytics
+     * Overview & Analytics Content
      */
     private function render_tab_overview() {
         $stats = FileHub_Attachment::get_system_stats();
@@ -257,7 +287,7 @@ class FileHub_Admin {
     }
 
     /**
-     * Tab 2: General & Security Settings
+     * Settings Tab: General & Security
      */
     private function render_tab_general() {
         $guest_upload = get_option( 'filehub_guest_upload', '0' );
@@ -322,27 +352,19 @@ class FileHub_Admin {
      */
     private function get_required_pages_config(): array {
         return array(
-            'filehub_page_register'        => array(
-                'title'     => __( 'Kayıt Ol', 'gnn-filehub' ),
-                'shortcode' => '[filehub_register]',
+            'filehub_page_account'     => array(
+                'title'     => __( 'Hesabım', 'gnn-filehub' ),
+                'shortcode' => '[filehub_account]',
             ),
-            'filehub_page_login'           => array(
-                'title'     => __( 'Giriş Yap', 'gnn-filehub' ),
-                'shortcode' => '[filehub_login]',
-            ),
-            'filehub_page_profile'         => array(
-                'title'     => __( 'Profilim', 'gnn-filehub' ),
-                'shortcode' => '[filehub_profile]',
-            ),
-            'filehub_page_uploader'        => array(
+            'filehub_page_uploader'    => array(
                 'title'     => __( 'Dosya Yükle', 'gnn-filehub' ),
                 'shortcode' => '[filehub_uploader]',
             ),
-            'filehub_page_manager'         => array(
+            'filehub_page_manager'     => array(
                 'title'     => __( 'Dosyalarım', 'gnn-filehub' ),
                 'shortcode' => '[filehub_manager]',
             ),
-            'filehub_page_admin_files'     => array(
+            'filehub_page_admin_files' => array(
                 'title'     => __( 'Tüm Dosyalar', 'gnn-filehub' ),
                 'shortcode' => '[filehub_admin_files]',
             ),
@@ -366,9 +388,9 @@ class FileHub_Admin {
         wp_safe_redirect(
             add_query_arg(
                 array(
-                    'page'                    => 'filehub',
-                    'tab'                     => 'pages',
-                    'filehub_pages_created'   => $created,
+                    'page'                  => 'filehub-settings',
+                    'tab'                   => 'pages',
+                    'filehub_pages_created' => $created,
                 ),
                 admin_url( 'admin.php' )
             )
@@ -411,7 +433,7 @@ class FileHub_Admin {
     }
 
     /**
-     * Tab 3: Automatic Page Assignments
+     * Settings Tab: Automatic Page Assignments
      */
     private function render_tab_pages() {
         ?>
@@ -450,50 +472,23 @@ class FileHub_Admin {
             <div class="filehub-card">
                 <h3><?php esc_html_e( 'Otomatik Sayfa Atamaları', 'gnn-filehub' ); ?></h3>
                 <p style="color: #646970; margin-bottom: 20px;">
-                    <?php esc_html_e( 'Aşağıdaki WordPress sayfalarını seçtiğinizde, kısa kodlar (shortcode) ilgili sayfalara otomatik olarak gömülür. Manuel kısa kod yazmak zorunda kalmazsınız. Şifre değiştirme formu artık ayrı bir sayfa gerektirmez; Profil sayfasının içinde otomatik olarak yer alır.', 'gnn-filehub' ); ?>
+                    <?php esc_html_e( 'Aşağıdaki WordPress sayfalarını seçtiğinizde, kısa kodlar (shortcode) ilgili sayfalara otomatik olarak gömülür. Manuel kısa kod yazmak zorunda kalmazsınız.', 'gnn-filehub' ); ?>
                 </p>
 
                 <table class="form-table">
                     <tr>
-                        <th scope="row"><label for="filehub_page_register"><?php esc_html_e( 'Kayıt Ol Sayfası [filehub_register]', 'gnn-filehub' ); ?></label></th>
+                        <th scope="row"><label for="filehub_page_account"><?php esc_html_e( 'Hesap Sayfası (Giriş / Kayıt / Profil) [filehub_account]', 'gnn-filehub' ); ?></label></th>
                         <td>
                             <?php
                             wp_dropdown_pages( array(
-                                'name'              => 'filehub_page_register',
-                                'selected'          => get_option( 'filehub_page_register', 0 ),
+                                'name'              => 'filehub_page_account',
+                                'selected'          => get_option( 'filehub_page_account', 0 ),
                                 'show_option_none'  => __( '-- Sayfa Seçin --', 'gnn-filehub' ),
                                 'option_none_value' => '0',
                                 'class'             => 'regular-text',
                             ) );
                             ?>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row"><label for="filehub_page_login"><?php esc_html_e( 'Giriş Yap Sayfası [filehub_login]', 'gnn-filehub' ); ?></label></th>
-                        <td>
-                            <?php
-                            wp_dropdown_pages( array(
-                                'name'              => 'filehub_page_login',
-                                'selected'          => get_option( 'filehub_page_login', 0 ),
-                                'show_option_none'  => __( '-- Sayfa Seçin --', 'gnn-filehub' ),
-                                'option_none_value' => '0',
-                                'class'             => 'regular-text',
-                            ) );
-                            ?>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row"><label for="filehub_page_profile"><?php esc_html_e( 'Profil Sayfası [filehub_profile]', 'gnn-filehub' ); ?></label></th>
-                        <td>
-                            <?php
-                            wp_dropdown_pages( array(
-                                'name'              => 'filehub_page_profile',
-                                'selected'          => get_option( 'filehub_page_profile', 0 ),
-                                'show_option_none'  => __( '-- Sayfa Seçin --', 'gnn-filehub' ),
-                                'option_none_value' => '0',
-                                'class'             => 'regular-text',
-                            ) );
-                            ?>
+                            <p class="description"><?php esc_html_e( 'Tek sayfa: oturum kapalıysa giriş/kayıt sekmeleri, oturum açıksa profil ve şifre güncelleme gösterilir. Nav menüde bu sayfaya eklenen bağlantı, oturum durumuna göre otomatik olarak "Giriş Yap" veya "Profil" yazısına döner.', 'gnn-filehub' ); ?></p>
                         </td>
                     </tr>
                     <tr>
@@ -548,7 +543,7 @@ class FileHub_Admin {
     }
 
     /**
-     * Tab 4: Storage Drivers & API Configurations
+     * Settings Tab: Storage Drivers & API Configurations
      */
     private function render_tab_storage() {
         $driver = get_option( 'filehub_storage_driver', 'local' );
@@ -647,7 +642,7 @@ class FileHub_Admin {
     }
 
     /**
-     * Tab 5: All Members' Files (Admin-Only Backend View)
+     * All Members' Files (Admin-Only Backend View) Content
      */
     private function render_tab_files() {
         ?>
@@ -661,6 +656,237 @@ class FileHub_Admin {
             </div>
         </div>
         <?php
+    }
+
+    /**
+     * Whitelist of Exportable/Importable Option Keys & their Sanitization Type
+     * This is the single source of truth for the Bakım (Maintenance) export/import feature —
+     * only keys listed here are ever read from an uploaded file, so an import can never write
+     * to arbitrary WordPress options.
+     *
+     * @return array<string,string>
+     */
+    private function get_settings_schema(): array {
+        return array(
+            'filehub_guest_upload'         => 'checkbox',
+            'filehub_strict_mime'          => 'checkbox',
+            'filehub_auto_rename'          => 'checkbox',
+            'filehub_allowed_extensions'   => 'text',
+            'filehub_page_account'         => 'page_id',
+            'filehub_page_uploader'        => 'page_id',
+            'filehub_page_manager'         => 'page_id',
+            'filehub_page_admin_files'     => 'page_id',
+            'filehub_storage_driver'       => 'driver',
+            'filehub_r2_account_id'        => 'text',
+            'filehub_r2_access_key'        => 'text',
+            'filehub_r2_secret_key'        => 'text',
+            'filehub_r2_bucket'            => 'text',
+            'filehub_gdrive_client_id'     => 'text',
+            'filehub_gdrive_client_secret' => 'text',
+            'filehub_gdrive_refresh_token' => 'text',
+            'filehub_gdrive_folder_id'     => 'text',
+        );
+    }
+
+    /**
+     * Sanitize a Single Imported Setting Value According to its Declared Type
+     *
+     * @param string $type  One of: checkbox, text, page_id, driver.
+     * @param mixed  $value Raw value decoded from the uploaded JSON.
+     * @return string|int
+     */
+    private function sanitize_imported_setting_value( string $type, $value ) {
+        switch ( $type ) {
+            case 'checkbox':
+                return ( '1' === (string) $value ) ? '1' : '0';
+
+            case 'page_id':
+                $page_id = absint( $value );
+                return ( $page_id && get_post( $page_id ) ) ? $page_id : 0;
+
+            case 'driver':
+                return in_array( $value, array( 'local', 'r2', 'gdrive' ), true ) ? $value : 'local';
+
+            case 'text':
+            default:
+                return sanitize_text_field( (string) $value );
+        }
+    }
+
+    /**
+     * Settings Tab: Bakım (Maintenance) — Export / Import Settings as JSON
+     */
+    private function render_tab_maintenance() {
+        $import_status = isset( $_GET['filehub_import'] ) ? sanitize_text_field( $_GET['filehub_import'] ) : '';
+        ?>
+        <?php if ( $import_status ) : ?>
+            <div class="notice notice-<?php echo 'success' === $import_status ? 'success' : 'error'; ?> is-dismissible">
+                <p>
+                    <?php
+                    switch ( $import_status ) {
+                        case 'success':
+                            $count = isset( $_GET['filehub_import_count'] ) ? (int) $_GET['filehub_import_count'] : 0;
+                            printf(
+                                /* translators: %d: number of settings updated */
+                                esc_html__( 'Ayarlar başarıyla içe aktarıldı. %d ayar güncellendi.', 'gnn-filehub' ),
+                                $count
+                            );
+                            break;
+                        case 'invalid_type':
+                            esc_html_e( 'Lütfen geçerli bir .json dosyası yükleyin.', 'gnn-filehub' );
+                            break;
+                        case 'too_large':
+                            esc_html_e( 'Dosya çok büyük.', 'gnn-filehub' );
+                            break;
+                        case 'invalid_json':
+                            esc_html_e( 'Dosya geçerli bir GNN Filehub ayar dosyası değil.', 'gnn-filehub' );
+                            break;
+                        default:
+                            esc_html_e( 'İçe aktarma başarısız oldu.', 'gnn-filehub' );
+                            break;
+                    }
+                    ?>
+                </p>
+            </div>
+        <?php endif; ?>
+
+        <div class="filehub-card" style="margin-bottom: 20px;">
+            <h3><?php esc_html_e( 'Ayarları Dışa Aktar', 'gnn-filehub' ); ?></h3>
+            <p class="description" style="margin-bottom: 15px;">
+                <?php esc_html_e( 'Genel & güvenlik ayarlarınızı, sayfa atamalarınızı ve depolama sürücü yapılandırmanızı tek bir JSON dosyası olarak indirin. Eklentiyi yeniden kurduğunuzda bu dosyayı içe aktararak kaldığınız yerden devam edebilirsiniz.', 'gnn-filehub' ); ?>
+            </p>
+            <p style="color: #b32d2e; margin-bottom: 15px;">
+                <strong><?php esc_html_e( 'Uyarı:', 'gnn-filehub' ); ?></strong>
+                <?php esc_html_e( 'Depolama sürücüsü yapılandırdıysanız bu dosya Cloudflare R2 / Google Drive API anahtarlarınızı düz metin olarak içerir. Güvenli bir yerde saklayın ve kimseyle paylaşmayın.', 'gnn-filehub' ); ?>
+            </p>
+            <?php
+            $export_url = wp_nonce_url(
+                admin_url( 'admin.php?page=filehub-settings&tab=maintenance&filehub_export=1' ),
+                'filehub_export_settings'
+            );
+            ?>
+            <a href="<?php echo esc_url( $export_url ); ?>" class="button button-primary"><?php esc_html_e( 'Ayarları Dışa Aktar (JSON)', 'gnn-filehub' ); ?></a>
+        </div>
+
+        <div class="filehub-card">
+            <h3><?php esc_html_e( 'Ayarları İçe Aktar', 'gnn-filehub' ); ?></h3>
+            <p class="description" style="margin-bottom: 15px;">
+                <?php esc_html_e( 'Daha önce dışa aktardığınız bir JSON dosyasını yükleyerek eski ayarlarınızı geri yükleyin. Yalnızca GNN Filehub\'a ait bilinen ayarlar okunur; dosyadaki başka hiçbir veri işlenmez.', 'gnn-filehub' ); ?>
+            </p>
+            <form method="post" action="" enctype="multipart/form-data">
+                <?php wp_nonce_field( 'filehub_import_settings', 'filehub_import_nonce' ); ?>
+                <input type="file" name="filehub_import_file" accept=".json,application/json" required>
+                <?php submit_button( __( 'Ayarları İçe Aktar', 'gnn-filehub' ), 'secondary', 'filehub_import_submit', false, array( 'style' => 'margin-left: 10px;' ) ); ?>
+            </form>
+        </div>
+        <?php
+    }
+
+    /**
+     * Handle "Ayarları Dışa Aktar" — Streams a JSON Download of Known FileHub Settings
+     */
+    public function handle_export_settings() {
+        if ( ! isset( $_GET['filehub_export'] ) || '1' !== $_GET['filehub_export'] ) {
+            return;
+        }
+
+        if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'filehub_export_settings' ) ) {
+            wp_die( esc_html__( 'Güvenlik doğrulaması başarısız.', 'gnn-filehub' ) );
+        }
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( esc_html__( 'Bu işlem için yetkiniz yok.', 'gnn-filehub' ) );
+        }
+
+        $settings = array();
+        foreach ( array_keys( $this->get_settings_schema() ) as $option_name ) {
+            $settings[ $option_name ] = get_option( $option_name, '' );
+        }
+
+        $payload = array(
+            'plugin'      => 'gnn-filehub',
+            'version'     => defined( 'GNN_FILEHUB_VERSION' ) ? GNN_FILEHUB_VERSION : '',
+            'exported_at' => gmdate( 'c' ),
+            'settings'    => $settings,
+        );
+
+        nocache_headers();
+        header( 'Content-Type: application/json; charset=utf-8' );
+        header( 'Content-Disposition: attachment; filename="gnn-filehub-settings-' . gmdate( 'Y-m-d' ) . '.json"' );
+        echo wp_json_encode( $payload, JSON_PRETTY_PRINT );
+        exit;
+    }
+
+    /**
+     * Handle "Ayarları İçe Aktar" — Validates & Applies an Uploaded Settings JSON File
+     * Only ever writes to the whitelisted option keys from get_settings_schema(), each
+     * re-sanitized by its declared type — the uploaded file can never set arbitrary options.
+     */
+    public function handle_import_settings() {
+        if ( ! isset( $_POST['filehub_import_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['filehub_import_nonce'] ) ), 'filehub_import_settings' ) ) {
+            return;
+        }
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            return;
+        }
+
+        $redirect_base = array(
+            'page' => 'filehub-settings',
+            'tab'  => 'maintenance',
+        );
+
+        if ( empty( $_FILES['filehub_import_file'] ) || UPLOAD_ERR_OK !== $_FILES['filehub_import_file']['error'] ) {
+            wp_safe_redirect( add_query_arg( array_merge( $redirect_base, array( 'filehub_import' => 'error' ) ), admin_url( 'admin.php' ) ) );
+            exit;
+        }
+
+        $file = $_FILES['filehub_import_file'];
+
+        $filetype = wp_check_filetype( $file['name'], array( 'json' => 'application/json' ) );
+        if ( empty( $filetype['ext'] ) || 'json' !== $filetype['ext'] ) {
+            wp_safe_redirect( add_query_arg( array_merge( $redirect_base, array( 'filehub_import' => 'invalid_type' ) ), admin_url( 'admin.php' ) ) );
+            exit;
+        }
+
+        if ( $file['size'] > 1048576 ) { // 1MB is far more than a settings file could ever need
+            wp_safe_redirect( add_query_arg( array_merge( $redirect_base, array( 'filehub_import' => 'too_large' ) ), admin_url( 'admin.php' ) ) );
+            exit;
+        }
+
+        if ( ! is_uploaded_file( $file['tmp_name'] ) ) {
+            wp_safe_redirect( add_query_arg( array_merge( $redirect_base, array( 'filehub_import' => 'error' ) ), admin_url( 'admin.php' ) ) );
+            exit;
+        }
+
+        $contents = file_get_contents( $file['tmp_name'] );
+        $decoded  = json_decode( (string) $contents, true );
+
+        if ( ! is_array( $decoded ) || empty( $decoded['settings'] ) || ! is_array( $decoded['settings'] ) ) {
+            wp_safe_redirect( add_query_arg( array_merge( $redirect_base, array( 'filehub_import' => 'invalid_json' ) ), admin_url( 'admin.php' ) ) );
+            exit;
+        }
+
+        $schema  = $this->get_settings_schema();
+        $applied = 0;
+
+        foreach ( $decoded['settings'] as $option_name => $raw_value ) {
+            if ( ! isset( $schema[ $option_name ] ) ) {
+                continue; // Ignore anything outside our known settings — no arbitrary option writes.
+            }
+
+            $sanitized = $this->sanitize_imported_setting_value( $schema[ $option_name ], $raw_value );
+            update_option( $option_name, $sanitized );
+            $applied++;
+        }
+
+        wp_safe_redirect(
+            add_query_arg(
+                array_merge( $redirect_base, array( 'filehub_import' => 'success', 'filehub_import_count' => $applied ) ),
+                admin_url( 'admin.php' )
+            )
+        );
+        exit;
     }
 
     /**

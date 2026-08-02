@@ -186,11 +186,37 @@ class FileHub_REST_API extends WP_REST_Controller {
             @copy( $chunk_file['tmp_name'], $part_file );
         }
 
-        // Check if all chunks have been uploaded
-        $parts = glob( $chunk_dir . '/part_*' );
-        $parts_count = is_array( $parts ) ? count( $parts ) : 0;
+        // Chunks can now arrive concurrently (the browser uploads several in parallel for
+        // speed), so more than one request can see "all parts present" at nearly the same
+        // moment. A blocking file lock, keyed by user+file_id and kept OUTSIDE the chunk
+        // directory, guarantees only one of them actually performs the merge — everyone
+        // else just reports their own chunk as saved.
+        $locks_dir = $upload_dir['basedir'] . '/filehub-protected/chunks/.locks';
+        if ( ! file_exists( $locks_dir ) ) {
+            wp_mkdir_p( $locks_dir );
+        }
+        $lock_path = $locks_dir . '/' . $user_id . '_' . $file_id . '.lock';
+        $lock_fp   = @fopen( $lock_path, 'c' );
 
-        if ( $parts_count < $total_chunks ) {
+        $merge_response = null;
+
+        if ( $lock_fp && flock( $lock_fp, LOCK_EX ) ) {
+            clearstatcache();
+            $parts       = is_dir( $chunk_dir ) ? glob( $chunk_dir . '/part_*' ) : array();
+            $parts_count = is_array( $parts ) ? count( $parts ) : 0;
+
+            if ( $parts_count >= $total_chunks && is_dir( $chunk_dir ) ) {
+                $merge_response = $this->merge_uploaded_chunks( $chunk_dir, $total_chunks, $user_id, $file_id, $filename, $ext, $chunk_file );
+            }
+
+            flock( $lock_fp, LOCK_UN );
+        }
+        if ( $lock_fp ) {
+            fclose( $lock_fp );
+        }
+        @unlink( $lock_path );
+
+        if ( null === $merge_response ) {
             return new WP_REST_Response( array(
                 'success'     => true,
                 'chunk_index' => $chunk_index,
@@ -198,7 +224,14 @@ class FileHub_REST_API extends WP_REST_Controller {
             ), 200 );
         }
 
-        // All chunks received! Stream-merge them into temporary assembled file
+        return $merge_response;
+    }
+
+    /**
+     * Merge all Received Chunks into the Final File & Persist via the Active Storage Driver
+     * Only ever called from within the upload-chunk lock, so it runs at most once per upload.
+     */
+    private function merge_uploaded_chunks( $chunk_dir, $total_chunks, $user_id, $file_id, $filename, $ext, $chunk_file ) {
         $assembled_tmp = sys_get_temp_dir() . '/assembled_' . $user_id . '_' . $file_id . '.' . $ext;
         $out_stream    = fopen( $assembled_tmp, 'wb' );
 

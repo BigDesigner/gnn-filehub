@@ -19,10 +19,73 @@ class FileHub_Shortcodes {
         add_shortcode( 'filehub_profile', array( $this, 'render_profile_shortcode' ) );
         add_shortcode( 'filehub_password_change', array( $this, 'render_password_change_shortcode' ) );
         add_shortcode( 'filehub_admin_files', array( $this, 'render_admin_files_shortcode' ) );
+        add_shortcode( 'filehub_account', array( $this, 'render_account_shortcode' ) );
         add_action( 'wp_enqueue_scripts', array( $this, 'register_public_scripts' ) );
 
         // Automatic Shortcode Injection on Assigned Pages
         add_filter( 'the_content', array( $this, 'auto_inject_shortcodes' ) );
+
+        // WooCommerce-style Dynamic Nav Menu Label for the Account Page (Giriş Yap ⇄ Profil).
+        // Two hooks are needed to cover both menu systems WordPress themes use today:
+        // classic menus (wp_nav_menu()) and the block-theme Navigation block.
+        add_filter( 'wp_nav_menu_objects', array( $this, 'filter_account_menu_label' ) );
+        add_filter( 'render_block', array( $this, 'filter_account_menu_block_label' ), 10, 2 );
+    }
+
+    /**
+     * Dynamically Relabel the Account Page's Nav Menu Item — Classic Menus
+     * Shows "Giriş Yap" when logged out and "Profil" when logged in, WooCommerce "My Account"-style.
+     */
+    public function filter_account_menu_label( $items ) {
+        $account_page_id = (int) get_option( 'filehub_page_account', 0 );
+        if ( ! $account_page_id ) {
+            return $items;
+        }
+
+        foreach ( $items as $item ) {
+            if ( 'page' === $item->object && (int) $item->object_id === $account_page_id ) {
+                $item->title = is_user_logged_in()
+                    ? __( 'Profil', 'gnn-filehub' )
+                    : __( 'Giriş Yap', 'gnn-filehub' );
+            }
+        }
+
+        return $items;
+    }
+
+    /**
+     * Dynamically Relabel the Account Page's Nav Menu Item — Block-Theme Navigation Block
+     * core/navigation-link doesn't go through wp_nav_menu_objects, so it needs its own hook.
+     * The label text is wrapped in a standard `.wp-block-navigation-item__label` span in every
+     * WordPress core version that ships the Navigation block, which is what makes this safe.
+     */
+    public function filter_account_menu_block_label( $block_content, $block ) {
+        if ( empty( $block['blockName'] ) || 'core/navigation-link' !== $block['blockName'] ) {
+            return $block_content;
+        }
+
+        $account_page_id = (int) get_option( 'filehub_page_account', 0 );
+        if ( ! $account_page_id ) {
+            return $block_content;
+        }
+
+        $linked_type = isset( $block['attrs']['type'] ) ? $block['attrs']['type'] : '';
+        $linked_id   = isset( $block['attrs']['id'] ) ? (int) $block['attrs']['id'] : 0;
+
+        if ( 'page' !== $linked_type || $linked_id !== $account_page_id ) {
+            return $block_content;
+        }
+
+        $label = is_user_logged_in() ? __( 'Profil', 'gnn-filehub' ) : __( 'Giriş Yap', 'gnn-filehub' );
+
+        $updated = preg_replace(
+            '/(<span class="wp-block-navigation-item__label">)(.*?)(<\/span>)/s',
+            '$1' . esc_html( $label ) . '$3',
+            $block_content,
+            1
+        );
+
+        return null !== $updated ? $updated : $block_content;
     }
 
     /**
@@ -36,9 +99,7 @@ class FileHub_Shortcodes {
         $current_page_id = get_the_ID();
 
         $pages_map = array(
-            'filehub_page_register'    => '[filehub_register]',
-            'filehub_page_login'       => '[filehub_login]',
-            'filehub_page_profile'     => '[filehub_profile]',
+            'filehub_page_account'     => '[filehub_account]',
             'filehub_page_uploader'    => '[filehub_uploader]',
             'filehub_page_manager'     => '[filehub_manager]',
             'filehub_page_admin_files' => '[filehub_admin_files]',
@@ -110,7 +171,7 @@ class FileHub_Shortcodes {
                     </svg>
                     <p class="filehub-dropzone-title"><?php esc_html_e( 'Dosyaları buraya sürükleyin', 'gnn-filehub' ); ?></p>
                     <p class="filehub-dropzone-subtitle"><?php esc_html_e( 'veya bilgisayarınızdan seçmek için tıklayın', 'gnn-filehub' ); ?></p>
-                    <input type="file" id="filehub-file-input" style="display: none;">
+                    <input type="file" id="filehub-file-input" multiple style="display: none;">
                     <form onsubmit="return false;">
                         <button type="button" class="button button-primary" onclick="document.getElementById('filehub-file-input').click();"><?php esc_html_e( 'Dosya Seç', 'gnn-filehub' ); ?></button>
                     </form>
@@ -228,24 +289,35 @@ class FileHub_Shortcodes {
             <div class="filehub-container">
                 <div class="filehub-card filehub-auth-card">
                     <h3><?php esc_html_e( 'Kullanıcı Girişi', 'gnn-filehub' ); ?></h3>
-                    <div class="filehub-auth-form-inner">
-                        <?php
-                        wp_login_form( array(
-                            'echo'           => true,
-                            'redirect'       => get_permalink(),
-                            'form_id'        => 'filehub-login-form',
-                            'label_username' => __( 'Kullanıcı Adı veya E-posta', 'gnn-filehub' ),
-                            'label_password' => __( 'Şifre', 'gnn-filehub' ),
-                            'label_remember' => __( 'Beni Hatırla', 'gnn-filehub' ),
-                            'label_log_in'   => __( 'Giriş Yap', 'gnn-filehub' ),
-                            'remember'       => true,
-                        ) );
-                        ?>
-                    </div>
+                    <?php echo $this->render_login_form_markup(); ?>
                 </div>
             </div>
             <?php
         }
+        return ob_get_clean();
+    }
+
+    /**
+     * Shared Login Form Markup (used by [filehub_login] and the unified account tabs)
+     */
+    private function render_login_form_markup() {
+        ob_start();
+        ?>
+        <div class="filehub-auth-form-inner">
+            <?php
+            wp_login_form( array(
+                'echo'           => true,
+                'redirect'       => get_permalink(),
+                'form_id'        => 'filehub-login-form',
+                'label_username' => __( 'Kullanıcı Adı veya E-posta', 'gnn-filehub' ),
+                'label_password' => __( 'Şifre', 'gnn-filehub' ),
+                'label_remember' => __( 'Beni Hatırla', 'gnn-filehub' ),
+                'label_log_in'   => __( 'Giriş Yap', 'gnn-filehub' ),
+                'remember'       => true,
+            ) );
+            ?>
+        </div>
+        <?php
         return ob_get_clean();
     }
 
@@ -269,40 +341,114 @@ class FileHub_Shortcodes {
         <div class="filehub-container">
             <div class="filehub-card filehub-auth-card">
                 <h3><?php esc_html_e( 'Yeni Hesap Oluştur', 'gnn-filehub' ); ?></h3>
-                <div class="filehub-auth-form-inner">
-                    <form id="filehub-register-form">
-                        <div class="filehub-field">
-                            <label for="filehub_reg_username"><?php esc_html_e( 'Kullanıcı Adı *', 'gnn-filehub' ); ?></label>
-                            <input type="text" id="filehub_reg_username" required>
-                        </div>
-                        <div class="filehub-field">
-                            <label for="filehub_reg_email"><?php esc_html_e( 'E-posta Adresi *', 'gnn-filehub' ); ?></label>
-                            <input type="email" id="filehub_reg_email" required>
-                        </div>
-                        <div class="filehub-field-row">
-                            <div class="filehub-field">
-                                <label for="filehub_reg_first_name"><?php esc_html_e( 'Adı', 'gnn-filehub' ); ?></label>
-                                <input type="text" id="filehub_reg_first_name">
-                            </div>
-                            <div class="filehub-field">
-                                <label for="filehub_reg_last_name"><?php esc_html_e( 'Soyadı', 'gnn-filehub' ); ?></label>
-                                <input type="text" id="filehub_reg_last_name">
-                            </div>
-                        </div>
-                        <div class="filehub-field">
-                            <label for="filehub_reg_password"><?php esc_html_e( 'Şifre *', 'gnn-filehub' ); ?></label>
-                            <input type="password" id="filehub_reg_password" required minlength="6">
-                        </div>
-                        <div class="filehub-field">
-                            <label for="filehub_reg_confirm_password"><?php esc_html_e( 'Şifre (Tekrar) *', 'gnn-filehub' ); ?></label>
-                            <input type="password" id="filehub_reg_confirm_password" required minlength="6">
-                        </div>
-                        <button type="submit" class="button button-primary" style="width: 100%; padding: 8px; font-size: 1.05em;"><?php esc_html_e( 'Kayıt Ol', 'gnn-filehub' ); ?></button>
-                    </form>
-                    <p id="filehub-register-status" style="margin-top: 12px; font-weight: 600; text-align: center;"></p>
-                </div>
+                <?php echo $this->render_register_form_markup(); ?>
             </div>
         </div>
+        <?php
+        return ob_get_clean();
+    }
+
+    /**
+     * Shared Register Form Markup (used by [filehub_register] and the unified account tabs)
+     */
+    private function render_register_form_markup() {
+        wp_enqueue_style( 'filehub-public-css' );
+        wp_enqueue_script( 'filehub-public-js' );
+
+        ob_start();
+        ?>
+        <div class="filehub-auth-form-inner">
+            <form id="filehub-register-form">
+                <div class="filehub-field">
+                    <label for="filehub_reg_username"><?php esc_html_e( 'Kullanıcı Adı *', 'gnn-filehub' ); ?></label>
+                    <input type="text" id="filehub_reg_username" required>
+                </div>
+                <div class="filehub-field">
+                    <label for="filehub_reg_email"><?php esc_html_e( 'E-posta Adresi *', 'gnn-filehub' ); ?></label>
+                    <input type="email" id="filehub_reg_email" required>
+                </div>
+                <div class="filehub-field-row">
+                    <div class="filehub-field">
+                        <label for="filehub_reg_first_name"><?php esc_html_e( 'Adı', 'gnn-filehub' ); ?></label>
+                        <input type="text" id="filehub_reg_first_name">
+                    </div>
+                    <div class="filehub-field">
+                        <label for="filehub_reg_last_name"><?php esc_html_e( 'Soyadı', 'gnn-filehub' ); ?></label>
+                        <input type="text" id="filehub_reg_last_name">
+                    </div>
+                </div>
+                <div class="filehub-field">
+                    <label for="filehub_reg_password"><?php esc_html_e( 'Şifre *', 'gnn-filehub' ); ?></label>
+                    <input type="password" id="filehub_reg_password" required minlength="6">
+                </div>
+                <div class="filehub-field">
+                    <label for="filehub_reg_confirm_password"><?php esc_html_e( 'Şifre (Tekrar) *', 'gnn-filehub' ); ?></label>
+                    <input type="password" id="filehub_reg_confirm_password" required minlength="6">
+                </div>
+                <button type="submit" class="button button-primary" style="width: 100%; padding: 8px; font-size: 1.05em;"><?php esc_html_e( 'Kayıt Ol', 'gnn-filehub' ); ?></button>
+            </form>
+            <p id="filehub-register-status" style="margin-top: 12px; font-weight: 600; text-align: center;"></p>
+        </div>
+        <?php
+        return ob_get_clean();
+    }
+
+    /**
+     * Render [filehub_account] Shortcode — Unified Login / Register / Profile Page
+     * WooCommerce "My Account"-style single page: shows a login/register tab switcher
+     * when logged out, and the full profile (incl. password change) when logged in.
+     */
+    public function render_account_shortcode( $atts ) {
+        if ( is_user_logged_in() ) {
+            return $this->render_profile_shortcode( $atts );
+        }
+
+        wp_enqueue_style( 'filehub-public-css' );
+        wp_enqueue_script( 'filehub-public-js' );
+
+        $registration_open = (bool) get_option( 'users_can_register' );
+
+        ob_start();
+        ?>
+        <div class="filehub-container">
+            <div class="filehub-card filehub-auth-card">
+                <?php if ( $registration_open ) : ?>
+                    <div class="filehub-auth-tabs">
+                        <button type="button" class="filehub-auth-tab is-active" data-target="login"><?php esc_html_e( 'Giriş Yap', 'gnn-filehub' ); ?></button>
+                        <button type="button" class="filehub-auth-tab" data-target="register"><?php esc_html_e( 'Kayıt Ol', 'gnn-filehub' ); ?></button>
+                    </div>
+                <?php else : ?>
+                    <h3><?php esc_html_e( 'Kullanıcı Girişi', 'gnn-filehub' ); ?></h3>
+                <?php endif; ?>
+
+                <div class="filehub-auth-tab-panel" data-panel="login">
+                    <?php echo $this->render_login_form_markup(); ?>
+                </div>
+
+                <?php if ( $registration_open ) : ?>
+                    <div class="filehub-auth-tab-panel" data-panel="register" hidden>
+                        <?php echo $this->render_register_form_markup(); ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php if ( $registration_open ) : ?>
+        <script>
+        (function() {
+            var root = document.currentScript.previousElementSibling;
+            if ( ! root ) return;
+            var tabs   = root.querySelectorAll( '.filehub-auth-tab' );
+            var panels = root.querySelectorAll( '.filehub-auth-tab-panel' );
+            tabs.forEach( function( tab ) {
+                tab.addEventListener( 'click', function() {
+                    var target = tab.getAttribute( 'data-target' );
+                    tabs.forEach( function( t ) { t.classList.toggle( 'is-active', t === tab ); } );
+                    panels.forEach( function( p ) { p.hidden = p.getAttribute( 'data-panel' ) !== target; } );
+                } );
+            } );
+        })();
+        </script>
+        <?php endif; ?>
         <?php
         return ob_get_clean();
     }
