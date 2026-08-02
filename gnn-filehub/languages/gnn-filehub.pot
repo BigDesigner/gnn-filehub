@@ -1,0 +1,119 @@
+# Copyright (C) 2026 GNN Team
+# This file is distributed under the same license as the GNN FileHub NextGen plugin.
+msgid ""
+msgstr ""
+"Project-Id-Version: GNN FileHub NextGen 1.0.0\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/gnn-filehub\n"
+"Last-Translator: GNN Team <info@gnn.com.tr>\n"
+"Language-Team: Turkish <info@gnn.com.tr>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2026-08-02T22:10:00+00:00\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"X-Generator: WP-CLI 2.8.0\n"
+"X-Domain: gnn-filehub\n"
+
+#. Plugin Name of the plugin
+msgid "GNN FileHub NextGen"
+msgstr ""
+
+#. Plugin URI of the plugin
+msgid "https://gnn.com.tr"
+msgstr ""
+
+#. Description of the plugin
+msgid "100% WordPress Core Native, zero-dependency file upload and multi-cloud storage management plugin."
+msgstr ""
+
+#. Author of the plugin
+msgid "GNN Team"
+msgstr ""
+
+#: gnn-filehub-nextgen.php:25
+msgid "FileHub - Genel Bakış"
+msgstr ""
+
+#: gnn-filehub-nextgen.php:37
+msgid "Genel Bakış"
+msgstr ""
+
+#: gnn-filehub-nextgen.php:45
+msgid "FileHub - Ayarlar"
+msgstr ""
+
+#: gnn-filehub-nextgen.php:46
+msgid "Ayarlar"
+msgstr ""
+
+#: inc/class-filehub-admin.php:120
+msgid "Genel Ayarlar"
+msgstr ""
+
+#: inc/class-filehub-admin.php:127
+msgid "Misafir Dosya Yükleme İzni"
+msgstr ""
+
+#: inc/class-filehub-admin.php:135
+msgid "Katı MIME Tipi Doğrulaması"
+msgstr ""
+
+#: inc/class-filehub-admin.php:143
+msgid "Çakışmada Otomatik İsim Değiştirme"
+msgstr ""
+
+#: inc/class-filehub-admin.php:151
+msgid "İzin Verilen Uzantılar"
+msgstr ""
+
+#: inc/class-filehub-admin.php:160
+msgid "Varsayılan Depolama Sürücüsü"
+msgstr ""
+
+#: inc/class-filehub-admin.php:272
+msgid "Otomatik Sayfa Atamaları"
+msgstr ""
+
+#: inc/class-filehub-admin.php:279
+msgid "Kayıt Ol Sayfası [filehub_register]"
+msgstr ""
+
+#: inc/class-filehub-admin.php:293
+msgid "Giriş Yap Sayfası [filehub_login]"
+msgstr ""
+
+#: inc/class-filehub-admin.php:307
+msgid "Profil Sayfası [filehub_profile]"
+msgstr ""
+
+#: inc/class-filehub-admin.php:321
+msgid "Şifre Değiştirme Sayfası [filehub_password_change]"
+msgstr ""
+
+#: inc/class-filehub-admin.php:335
+msgid "Dosya Yükleme Sayfası [filehub_uploader]"
+msgstr ""
+
+#: inc/class-filehub-admin.php:349
+msgid "Dosya Yöneticisi Sayfası [filehub_manager]"
+msgstr ""
+
+#: inc/class-filehub-admin.php:470
+msgid "Özel Depolama Kotası (MB)"
+msgstr ""
+
+#: inc/class-filehub-rest-api.php:90
+msgid "Dosya bulunamadı."
+msgstr ""
+
+#: inc/class-filehub-rest-api.php:100
+msgid "Bu dosya uzantısına izin verilmiyor."
+msgstr ""
+
+#: inc/class-filehub-rest-api.php:166
+msgid "Depolama kotanızı aştınız."
+msgstr ""
+
+#: inc/class-filehub-rest-api.php:218
+msgid "Tüm parçalar birleştirildi, yükleme başarılı!"
+msgstr ""
