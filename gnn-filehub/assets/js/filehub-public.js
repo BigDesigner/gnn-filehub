@@ -1,18 +1,85 @@
-/* GNN FileHub NextGen - Zero Dependency Native Public Drag & Drop, Manager, Password & Register JS */
+/* GNN Filehub - Zero Dependency Native Public Drag & Drop, Manager, Password & Register JS */
+
+/*
+ * Live theming: measures the page's actual rendered background color and toggles
+ * .filehub-theme-dark on every .filehub-container so our cards always match the theme's
+ * CURRENT state — whatever mechanism the theme uses to switch light/dark (OS preference,
+ * a manual toggle button, a class or data-attribute on <html>/<body>) — instead of guessing
+ * from a single signal like prefers-color-scheme, which can disagree with what the page is
+ * actually showing.
+ */
+(function () {
+  function relativeLuminance(rgbString) {
+    var m = rgbString && rgbString.match(/[\d.]+/g);
+    if (!m || m.length < 3) return 1; // assume light if we can't tell
+    var r = Number(m[0]), g = Number(m[1]), b = Number(m[2]);
+    return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  }
+
+  function getEffectiveBackgroundColor(startEl) {
+    var el = startEl;
+    while (el && el !== document.documentElement) {
+      var bg = getComputedStyle(el).backgroundColor;
+      if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') {
+        return bg;
+      }
+      el = el.parentElement;
+    }
+    var htmlBg = getComputedStyle(document.documentElement).backgroundColor;
+    if (htmlBg && htmlBg !== 'rgba(0, 0, 0, 0)') return htmlBg;
+    return getComputedStyle(document.body).backgroundColor;
+  }
+
+  function applyFilehubTheming() {
+    var containers = document.querySelectorAll('.filehub-container');
+    containers.forEach(function (container) {
+      var bg = getEffectiveBackgroundColor(container.parentElement || document.body);
+      var isDark = relativeLuminance(bg) < 0.5;
+      container.classList.toggle('filehub-theme-dark', isDark);
+    });
+  }
+
+  function init() {
+    applyFilehubTheming();
+
+    if (typeof MutationObserver !== 'undefined') {
+      var observer = new MutationObserver(function () {
+        applyFilehubTheming();
+      });
+      observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme', 'style'] });
+      observer.observe(document.body, { attributes: true, attributeFilter: ['class', 'data-theme', 'style'] });
+    }
+
+    if (window.matchMedia) {
+      var mq = window.matchMedia('(prefers-color-scheme: dark)');
+      if (mq.addEventListener) {
+        mq.addEventListener('change', applyFilehubTheming);
+      } else if (mq.addListener) {
+        mq.addListener(applyFilehubTheming);
+      }
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+
 document.addEventListener('DOMContentLoaded', function () {
   const dropZone = document.getElementById('filehub-dropzone');
   const fileInput = document.getElementById('filehub-file-input');
   const progressBar = document.getElementById('filehub-progress-bar');
   const progressFill = document.getElementById('filehub-progress-fill');
   const statusText = document.getElementById('filehub-status-text');
-  const fileListContainer = document.getElementById('filehub-file-list');
-  const searchInput = document.getElementById('filehub-search-input');
   const passwordForm = document.getElementById('filehub-password-form');
   const passwordStatus = document.getElementById('filehub-password-status');
   const registerForm = document.getElementById('filehub-register-form');
   const registerStatus = document.getElementById('filehub-register-status');
 
-  let cachedFilesData = [];
+  // Cache of the last fetched (unfiltered) rows per file-list container, for live search.
+  const fileListCache = new WeakMap();
 
   // Drag & Drop File Upload
   if (dropZone && fileInput) {
@@ -26,11 +93,15 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     ['dragenter', 'dragover'].forEach(eventName => {
-      dropZone.classList.add('filehub-highlight');
+      dropZone.addEventListener(eventName, function () {
+        dropZone.classList.add('filehub-highlight');
+      });
     });
 
     ['dragleave', 'drop'].forEach(eventName => {
-      dropZone.classList.remove('filehub-highlight');
+      dropZone.addEventListener(eventName, function () {
+        dropZone.classList.remove('filehub-highlight');
+      });
     });
 
     dropZone.addEventListener('drop', handleDrop, false);
@@ -87,7 +158,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (progressFill) progressFill.style.width = '100%';
             setTimeout(() => {
               if (progressBar) progressBar.style.display = 'none';
-              fetchFileList();
+              refreshAllFileLists();
             }, 1200);
           } else {
             try {
@@ -157,7 +228,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (progressFill) progressFill.style.width = '100%';
                 setTimeout(() => {
                   if (progressBar) progressBar.style.display = 'none';
-                  fetchFileList();
+                  refreshAllFileLists();
                 }, 1200);
               }
             } else {
@@ -180,10 +251,11 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   }
 
-  // File Manager & Live Search
-  function fetchFileList() {
-    if (!fileListContainer) return;
-    const scope = fileListContainer.getAttribute('data-scope') || 'own';
+  // File Manager & Live Search — supports any number of file-list blocks on the same page
+  // (e.g. the uploader shortcode shows the user's own files right below the dropzone).
+  function fetchFileList(container) {
+    if (!container) return;
+    const scope = container.getAttribute('data-scope') || 'own';
     fetch(filehub_vars.rest_url + 'filehub/v1/files?scope=' + encodeURIComponent(scope), {
       headers: {
         'X-WP-Nonce': filehub_vars.nonce
@@ -192,14 +264,18 @@ document.addEventListener('DOMContentLoaded', function () {
       .then(res => res.json())
       .then(data => {
         if (!Array.isArray(data)) return;
-        cachedFilesData = data;
-        renderFileList(cachedFilesData);
+        fileListCache.set(container, data);
+        renderFileList(container, data);
       })
       .catch(err => console.error(err));
   }
 
-  function renderFileList(items) {
-    if (!fileListContainer) return;
+  function refreshAllFileLists() {
+    document.querySelectorAll('.filehub-file-list').forEach(fetchFileList);
+  }
+
+  function renderFileList(container, items) {
+    if (!container) return;
     let html = '<div class="filehub-table-wrap"><table class="filehub-table"><thead><tr><th>Dosya Adı</th><th>Boyut</th><th>Sürücü</th><th>Yükleyen</th><th>İndirme</th><th>İşlem</th></tr></thead><tbody>';
     if (items.length === 0) {
       html += '<tr><td colspan="6" style="text-align:center; padding: 20px;">Dosya bulunamadı.</td></tr>';
@@ -220,20 +296,20 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     }
     html += '</tbody></table></div>';
-    fileListContainer.innerHTML = html;
+    container.innerHTML = html;
 
-    // Attach Delete Event Listeners
-    document.querySelectorAll('.filehub-delete-btn').forEach(btn => {
+    // Attach Delete Event Listeners (scoped to this container only)
+    container.querySelectorAll('.filehub-delete-btn').forEach(btn => {
       btn.addEventListener('click', function () {
         const fileId = this.getAttribute('data-id');
         if (confirm('Bu dosyayı kalıcı olarak silmek istediğinizden emin misiniz?')) {
-          deleteFile(fileId);
+          deleteFile(fileId, container);
         }
       });
     });
   }
 
-  function deleteFile(fileId) {
+  function deleteFile(fileId, container) {
     fetch(filehub_vars.rest_url + 'filehub/v1/files/' + fileId, {
       method: 'DELETE',
       headers: {
@@ -243,7 +319,7 @@ document.addEventListener('DOMContentLoaded', function () {
       .then(res => res.json())
       .then(resp => {
         if (resp.success) {
-          fetchFileList();
+          fetchFileList(container);
         } else {
           alert(resp.error || 'Silme işlemi başarısız.');
         }
@@ -251,15 +327,20 @@ document.addEventListener('DOMContentLoaded', function () {
       .catch(err => alert('Sunucu bağlantı hatası.'));
   }
 
-  if (searchInput) {
+  document.querySelectorAll('.filehub-search-input').forEach(searchInput => {
     searchInput.addEventListener('input', function () {
+      const scope = searchInput.closest('.filehub-uploader, .filehub-manager');
+      const container = scope ? scope.querySelector('.filehub-file-list') : null;
+      if (!container) return;
+
       const term = this.value.toLowerCase().trim();
-      const filtered = cachedFilesData.filter(item =>
+      const cached = fileListCache.get(container) || [];
+      const filtered = cached.filter(item =>
         item.title.toLowerCase().includes(term) || item.author_name.toLowerCase().includes(term)
       );
-      renderFileList(filtered);
+      renderFileList(container, filtered);
     });
-  }
+  });
 
   // Front-End Password Change Handler
   if (passwordForm) {
@@ -369,5 +450,5 @@ document.addEventListener('DOMContentLoaded', function () {
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
-  fetchFileList();
+  refreshAllFileLists();
 });

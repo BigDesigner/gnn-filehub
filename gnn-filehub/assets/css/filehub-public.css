@@ -5,6 +5,24 @@
   box-sizing: border-box;
 }
 
+/*
+ * Live dark-mode variant. This class is toggled at runtime by filehub-public.js after it
+ * measures the page's actual rendered background color, so it tracks whatever the active
+ * theme is really showing right now (OS preference, a manual light/dark switch, a class or
+ * data-attribute toggle — any mechanism) instead of guessing from a single CSS signal.
+ */
+.filehub-container.filehub-theme-dark {
+  --filehub-bg: #1e1e1e;
+  --filehub-bg-soft: #2a2a2a;
+  --filehub-bg-elevated: #24303d;
+  --filehub-border: #3c3c3c;
+  --filehub-border-soft: #333333;
+  --filehub-text: #f0f0f1;
+  --filehub-text-muted: #a7aaad;
+  --filehub-progress-bg: #333333;
+  --filehub-input-bg: #2a2a2a;
+}
+
 .filehub-container *,
 .filehub-container *::before,
 .filehub-container *::after {
@@ -139,13 +157,26 @@
 /* -------------------------------------------------- */
 /* Auth / Profile Cards                                */
 /* -------------------------------------------------- */
+
+/*
+ * Every .filehub-card (uploader, manager, auth, profile) is left at its natural block width
+ * — 100% of whatever container the theme gives the shortcode (boxed column, full-width
+ * template, a narrower sidebar widget area, ...). We never impose our own max-width on the
+ * card itself, so all of them behave identically and follow the theme's layout automatically.
+ * Forms that read better narrow (login/register/password) get an inner wrapper instead —
+ * see .filehub-auth-form-inner — so only the input column is constrained, not the card.
+ */
 .filehub-auth-card {
-  max-width: 460px;
-  margin: 20px auto;
+  margin: 20px 0;
 }
 
 .filehub-auth-card h3 {
   text-align: center;
+}
+
+.filehub-auth-form-inner {
+  max-width: 420px;
+  margin: 0 auto;
 }
 
 .filehub-field {
@@ -178,7 +209,6 @@
 }
 
 .filehub-profile-card {
-  max-width: 620px;
   margin: 20px 0;
 }
 

@@ -96,6 +96,8 @@ class FileHub_Shortcodes {
         wp_enqueue_style( 'filehub-public-css' );
         wp_enqueue_script( 'filehub-public-js' );
 
+        $show_own_files = is_user_logged_in();
+
         ob_start();
         ?>
         <div class="filehub-container">
@@ -117,6 +119,18 @@ class FileHub_Shortcodes {
                 </div>
                 <p id="filehub-status-text" style="margin-top: 10px; font-weight: 600;"></p>
             </div>
+
+            <?php if ( $show_own_files ) : ?>
+                <div class="filehub-card filehub-manager" style="margin-top: 20px;">
+                    <div class="filehub-manager-toolbar">
+                        <h3><?php esc_html_e( 'Yüklediğim Dosyalar', 'gnn-filehub' ); ?></h3>
+                        <input type="text" class="filehub-search-input" placeholder="<?php esc_attr_e( 'Dosya ara...', 'gnn-filehub' ); ?>">
+                    </div>
+                    <div class="filehub-file-list" data-scope="own">
+                        <p><?php esc_html_e( 'Yükleniyor...', 'gnn-filehub' ); ?></p>
+                    </div>
+                </div>
+            <?php endif; ?>
         </div>
         <?php
         return ob_get_clean();
@@ -140,9 +154,9 @@ class FileHub_Shortcodes {
             <div class="filehub-card filehub-manager">
                 <div class="filehub-manager-toolbar">
                     <h3><?php esc_html_e( 'Dosyalarım', 'gnn-filehub' ); ?></h3>
-                    <input type="text" id="filehub-search-input" class="filehub-search-input" placeholder="<?php esc_attr_e( 'Dosya ara...', 'gnn-filehub' ); ?>">
+                    <input type="text" class="filehub-search-input" placeholder="<?php esc_attr_e( 'Dosya ara...', 'gnn-filehub' ); ?>">
                 </div>
-                <div id="filehub-file-list" data-scope="own">
+                <div class="filehub-file-list" data-scope="own">
                     <p><?php esc_html_e( 'Yükleniyor...', 'gnn-filehub' ); ?></p>
                 </div>
             </div>
@@ -173,9 +187,9 @@ class FileHub_Shortcodes {
             <div class="filehub-card filehub-manager">
                 <div class="filehub-manager-toolbar">
                     <h3><?php esc_html_e( 'Tüm Üye Dosyaları', 'gnn-filehub' ); ?></h3>
-                    <input type="text" id="filehub-search-input" class="filehub-search-input" placeholder="<?php esc_attr_e( 'Dosya veya yükleyen ara...', 'gnn-filehub' ); ?>">
+                    <input type="text" class="filehub-search-input" placeholder="<?php esc_attr_e( 'Dosya veya yükleyen ara...', 'gnn-filehub' ); ?>">
                 </div>
-                <div id="filehub-file-list" data-scope="all">
+                <div class="filehub-file-list" data-scope="all">
                     <p><?php esc_html_e( 'Yükleniyor...', 'gnn-filehub' ); ?></p>
                 </div>
             </div>
@@ -196,12 +210,14 @@ class FileHub_Shortcodes {
             ?>
             <div class="filehub-container">
                 <div class="filehub-card filehub-auth-card" style="text-align: center;">
-                    <div style="margin-bottom: 15px;">
-                        <?php echo get_avatar( $user->ID, 80, '', '', array( 'style' => 'border-radius: 50%;' ) ); ?>
+                    <div class="filehub-auth-form-inner">
+                        <div style="margin-bottom: 15px;">
+                            <?php echo get_avatar( $user->ID, 80, '', '', array( 'style' => 'border-radius: 50%;' ) ); ?>
+                        </div>
+                        <h3><?php printf( esc_html__( 'Hoş Geldiniz, %s', 'gnn-filehub' ), esc_html( $user->display_name ) ); ?></h3>
+                        <p style="color: var(--filehub-text-muted);"><?php echo esc_html( $user->user_email ); ?></p>
+                        <a href="<?php echo esc_url( wp_logout_url( get_permalink() ) ); ?>" class="button button-secondary" style="margin-top: 10px;"><?php esc_html_e( 'Çıkış Yap', 'gnn-filehub' ); ?></a>
                     </div>
-                    <h3><?php printf( esc_html__( 'Hoş Geldiniz, %s', 'gnn-filehub' ), esc_html( $user->display_name ) ); ?></h3>
-                    <p style="color: var(--filehub-text-muted);"><?php echo esc_html( $user->user_email ); ?></p>
-                    <a href="<?php echo esc_url( wp_logout_url( get_permalink() ) ); ?>" class="button button-secondary" style="margin-top: 10px;"><?php esc_html_e( 'Çıkış Yap', 'gnn-filehub' ); ?></a>
                 </div>
             </div>
             <?php
@@ -210,18 +226,20 @@ class FileHub_Shortcodes {
             <div class="filehub-container">
                 <div class="filehub-card filehub-auth-card">
                     <h3><?php esc_html_e( 'Kullanıcı Girişi', 'gnn-filehub' ); ?></h3>
-                    <?php
-                    wp_login_form( array(
-                        'echo'           => true,
-                        'redirect'       => get_permalink(),
-                        'form_id'        => 'filehub-login-form',
-                        'label_username' => __( 'Kullanıcı Adı veya E-posta', 'gnn-filehub' ),
-                        'label_password' => __( 'Şifre', 'gnn-filehub' ),
-                        'label_remember' => __( 'Beni Hatırla', 'gnn-filehub' ),
-                        'label_log_in'   => __( 'Giriş Yap', 'gnn-filehub' ),
-                        'remember'       => true,
-                    ) );
-                    ?>
+                    <div class="filehub-auth-form-inner">
+                        <?php
+                        wp_login_form( array(
+                            'echo'           => true,
+                            'redirect'       => get_permalink(),
+                            'form_id'        => 'filehub-login-form',
+                            'label_username' => __( 'Kullanıcı Adı veya E-posta', 'gnn-filehub' ),
+                            'label_password' => __( 'Şifre', 'gnn-filehub' ),
+                            'label_remember' => __( 'Beni Hatırla', 'gnn-filehub' ),
+                            'label_log_in'   => __( 'Giriş Yap', 'gnn-filehub' ),
+                            'remember'       => true,
+                        ) );
+                        ?>
+                    </div>
                 </div>
             </div>
             <?php
@@ -249,36 +267,38 @@ class FileHub_Shortcodes {
         <div class="filehub-container">
             <div class="filehub-card filehub-auth-card">
                 <h3><?php esc_html_e( 'Yeni Hesap Oluştur', 'gnn-filehub' ); ?></h3>
-                <form id="filehub-register-form">
-                    <div class="filehub-field">
-                        <label for="filehub_reg_username"><?php esc_html_e( 'Kullanıcı Adı *', 'gnn-filehub' ); ?></label>
-                        <input type="text" id="filehub_reg_username" required>
-                    </div>
-                    <div class="filehub-field">
-                        <label for="filehub_reg_email"><?php esc_html_e( 'E-posta Adresi *', 'gnn-filehub' ); ?></label>
-                        <input type="email" id="filehub_reg_email" required>
-                    </div>
-                    <div class="filehub-field-row">
+                <div class="filehub-auth-form-inner">
+                    <form id="filehub-register-form">
                         <div class="filehub-field">
-                            <label for="filehub_reg_first_name"><?php esc_html_e( 'Adı', 'gnn-filehub' ); ?></label>
-                            <input type="text" id="filehub_reg_first_name">
+                            <label for="filehub_reg_username"><?php esc_html_e( 'Kullanıcı Adı *', 'gnn-filehub' ); ?></label>
+                            <input type="text" id="filehub_reg_username" required>
                         </div>
                         <div class="filehub-field">
-                            <label for="filehub_reg_last_name"><?php esc_html_e( 'Soyadı', 'gnn-filehub' ); ?></label>
-                            <input type="text" id="filehub_reg_last_name">
+                            <label for="filehub_reg_email"><?php esc_html_e( 'E-posta Adresi *', 'gnn-filehub' ); ?></label>
+                            <input type="email" id="filehub_reg_email" required>
                         </div>
-                    </div>
-                    <div class="filehub-field">
-                        <label for="filehub_reg_password"><?php esc_html_e( 'Şifre *', 'gnn-filehub' ); ?></label>
-                        <input type="password" id="filehub_reg_password" required minlength="6">
-                    </div>
-                    <div class="filehub-field">
-                        <label for="filehub_reg_confirm_password"><?php esc_html_e( 'Şifre (Tekrar) *', 'gnn-filehub' ); ?></label>
-                        <input type="password" id="filehub_reg_confirm_password" required minlength="6">
-                    </div>
-                    <button type="submit" class="button button-primary" style="width: 100%; padding: 8px; font-size: 1.05em;"><?php esc_html_e( 'Kayıt Ol', 'gnn-filehub' ); ?></button>
-                </form>
-                <p id="filehub-register-status" style="margin-top: 12px; font-weight: 600; text-align: center;"></p>
+                        <div class="filehub-field-row">
+                            <div class="filehub-field">
+                                <label for="filehub_reg_first_name"><?php esc_html_e( 'Adı', 'gnn-filehub' ); ?></label>
+                                <input type="text" id="filehub_reg_first_name">
+                            </div>
+                            <div class="filehub-field">
+                                <label for="filehub_reg_last_name"><?php esc_html_e( 'Soyadı', 'gnn-filehub' ); ?></label>
+                                <input type="text" id="filehub_reg_last_name">
+                            </div>
+                        </div>
+                        <div class="filehub-field">
+                            <label for="filehub_reg_password"><?php esc_html_e( 'Şifre *', 'gnn-filehub' ); ?></label>
+                            <input type="password" id="filehub_reg_password" required minlength="6">
+                        </div>
+                        <div class="filehub-field">
+                            <label for="filehub_reg_confirm_password"><?php esc_html_e( 'Şifre (Tekrar) *', 'gnn-filehub' ); ?></label>
+                            <input type="password" id="filehub_reg_confirm_password" required minlength="6">
+                        </div>
+                        <button type="submit" class="button button-primary" style="width: 100%; padding: 8px; font-size: 1.05em;"><?php esc_html_e( 'Kayıt Ol', 'gnn-filehub' ); ?></button>
+                    </form>
+                    <p id="filehub-register-status" style="margin-top: 12px; font-weight: 600; text-align: center;"></p>
+                </div>
             </div>
         </div>
         <?php
@@ -375,22 +395,24 @@ class FileHub_Shortcodes {
 
         ob_start();
         ?>
-        <form id="filehub-password-form">
-            <div class="filehub-field">
-                <label for="filehub_current_password"><?php esc_html_e( 'Mevcut Şifre', 'gnn-filehub' ); ?></label>
-                <input type="password" id="filehub_current_password" required>
-            </div>
-            <div class="filehub-field">
-                <label for="filehub_new_password"><?php esc_html_e( 'Yeni Şifre', 'gnn-filehub' ); ?></label>
-                <input type="password" id="filehub_new_password" required minlength="6">
-            </div>
-            <div class="filehub-field">
-                <label for="filehub_confirm_password"><?php esc_html_e( 'Yeni Şifre (Tekrar)', 'gnn-filehub' ); ?></label>
-                <input type="password" id="filehub_confirm_password" required minlength="6">
-            </div>
-            <button type="submit" class="button button-primary" style="width: 100%; padding: 6px;"><?php esc_html_e( 'Şifreyi Güncelle', 'gnn-filehub' ); ?></button>
-        </form>
-        <p id="filehub-password-status" style="margin-top: 12px; font-weight: 600;"></p>
+        <div class="filehub-auth-form-inner">
+            <form id="filehub-password-form">
+                <div class="filehub-field">
+                    <label for="filehub_current_password"><?php esc_html_e( 'Mevcut Şifre', 'gnn-filehub' ); ?></label>
+                    <input type="password" id="filehub_current_password" required>
+                </div>
+                <div class="filehub-field">
+                    <label for="filehub_new_password"><?php esc_html_e( 'Yeni Şifre', 'gnn-filehub' ); ?></label>
+                    <input type="password" id="filehub_new_password" required minlength="6">
+                </div>
+                <div class="filehub-field">
+                    <label for="filehub_confirm_password"><?php esc_html_e( 'Yeni Şifre (Tekrar)', 'gnn-filehub' ); ?></label>
+                    <input type="password" id="filehub_confirm_password" required minlength="6">
+                </div>
+                <button type="submit" class="button button-primary" style="width: 100%; padding: 6px;"><?php esc_html_e( 'Şifreyi Güncelle', 'gnn-filehub' ); ?></button>
+            </form>
+            <p id="filehub-password-status" style="margin-top: 12px; font-weight: 600;"></p>
+        </div>
         <?php
         return ob_get_clean();
     }

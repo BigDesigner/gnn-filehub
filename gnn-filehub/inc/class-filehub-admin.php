@@ -654,9 +654,9 @@ class FileHub_Admin {
         <div class="filehub-card filehub-manager" style="margin: 20px 0;">
             <div class="filehub-manager-toolbar">
                 <h3 style="margin: 0;"><?php esc_html_e( 'Tüm Üye Dosyaları', 'gnn-filehub' ); ?></h3>
-                <input type="text" id="filehub-search-input" class="filehub-search-input" placeholder="<?php esc_attr_e( 'Dosya veya yükleyen ara...', 'gnn-filehub' ); ?>">
+                <input type="text" class="filehub-search-input" placeholder="<?php esc_attr_e( 'Dosya veya yükleyen ara...', 'gnn-filehub' ); ?>">
             </div>
-            <div id="filehub-file-list" data-scope="all">
+            <div class="filehub-file-list" data-scope="all">
                 <p><?php esc_html_e( 'Yükleniyor...', 'gnn-filehub' ); ?></p>
             </div>
         </div>

@@ -1,7 +1,16 @@
 /* GNN Filehub - Modern WP Admin Tabbed Layout & Pure CSS Toggles */
 
 :root {
-  --filehub-theme-color: var(--wp-admin-theme-color, #2271b1);
+  /*
+   * Accent color resolution order:
+   * 1. --wp--preset--color--primary / --accent — set globally by WordPress block themes
+   *    (theme.json) on the front end.
+   * 2. --wp-admin-theme-color — only exists inside wp-admin, used there.
+   * 3. Neutral WP-blue fallback if neither the theme nor wp-admin expose one.
+   * This intentionally does NOT hardcode a brand color, so the plugin inherits
+   * whatever accent the active theme (or admin color scheme) actually uses.
+   */
+  --filehub-theme-color: var(--wp--preset--color--primary, var(--wp--preset--color--accent, var(--wp-admin-theme-color, #2271b1)));
   --filehub-bg: #ffffff;
   --filehub-bg-soft: #fafafa;
   --filehub-bg-elevated: #f0f6fc;
@@ -13,50 +22,16 @@
   --filehub-input-bg: #ffffff;
 }
 
-/* Dark mode: auto-adapt for front-end pages (theme dark mode / OS prefers-color-scheme).
-   The .wrap selector (wp-admin page wrapper) is excluded so the WP Admin panel keeps its
-   normal light styling regardless of the visiting admin's OS color scheme. */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --filehub-bg: #1e1e1e;
-    --filehub-bg-soft: #2a2a2a;
-    --filehub-bg-elevated: #24303d;
-    --filehub-border: #3c3c3c;
-    --filehub-border-soft: #333333;
-    --filehub-text: #f0f0f1;
-    --filehub-text-muted: #a7aaad;
-    --filehub-progress-bg: #333333;
-    --filehub-input-bg: #2a2a2a;
-  }
-
-  .wrap {
-    --filehub-bg: #ffffff;
-    --filehub-bg-soft: #fafafa;
-    --filehub-bg-elevated: #f0f6fc;
-    --filehub-border: #c3c4c7;
-    --filehub-border-soft: #f0f0f1;
-    --filehub-text: #1d2327;
-    --filehub-text-muted: #646970;
-    --filehub-progress-bg: #f0f0f1;
-    --filehub-input-bg: #ffffff;
-  }
-}
-
-/* Same override for themes/plugins that toggle dark mode via a class/attribute
-   instead of relying on the OS-level prefers-color-scheme signal. */
-.dark-mode :root,
-[data-theme="dark"],
-html.dark {
-  --filehub-bg: #1e1e1e;
-  --filehub-bg-soft: #2a2a2a;
-  --filehub-bg-elevated: #24303d;
-  --filehub-border: #3c3c3c;
-  --filehub-border-soft: #333333;
-  --filehub-text: #f0f0f1;
-  --filehub-text-muted: #a7aaad;
-  --filehub-progress-bg: #333333;
-  --filehub-input-bg: #2a2a2a;
-}
+/*
+ * Dark-mode variants are NOT applied via @media(prefers-color-scheme) here, because that
+ * only reflects the visitor's OS setting and can disagree with a theme's own light/dark
+ * toggle (e.g. OS = dark while the visitor manually switched the theme to light, or vice
+ * versa). Front-end dark mode is instead detected live from the page's actual rendered
+ * background by assets/js/filehub-public.js, which toggles .filehub-theme-dark on
+ * .filehub-container — see filehub-public.css for those variable overrides. This file
+ * (filehub-admin.css) is also loaded standalone inside wp-admin, which has no such toggle
+ * and is always light, so it only ever needs the light defaults above.
+ */
 
 /* Tab Navigation Styling */
 .filehub-nav-tab-wrapper {
