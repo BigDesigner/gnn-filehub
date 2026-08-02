@@ -10,9 +10,16 @@
 - **WordPress Core:** 6.0+ [Verified]
 - **Database:** MySQL 5.7+ / MariaDB 10.3+ [Verified]
 - **Dependencies:** 0 External Dependencies (Safely using WP Core HTTP API & REST Framework) [Verified]
+- **Version Source of Truth:** `VERSION` file in repository root [Verified]
+
+## CI/CD Pipelines
+- **Workflow File:** `.github/workflows/release.yml` [Verified]
+- **Trigger:** `workflow_dispatch` (Manuel tetikleme)
+- **Artifact:** Clean plugin ZIP archive (`gnn-filehub-nextgen-v<VERSION>.zip`) omitting dev/agent metadata.
 
 ## Directory Structure Map
 ```text
+VERSION
 gnn-filehub-nextgen.php
 inc/
   class-filehub-core.php
@@ -28,6 +35,9 @@ inc/
 assets/
   css/filehub-admin.css
   js/filehub-public.js
+.github/
+  workflows/
+    release.yml
 ```
 
 ## Recommended Validation Commands

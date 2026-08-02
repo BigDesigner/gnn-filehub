@@ -1,0 +1,60 @@
+name: Manual Plugin Release Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      create_github_release:
+        description: 'GitHub Release & Tag oluşturulsun mu?'
+        required: true
+        type: boolean
+        default: true
+
+jobs:
+  build:
+    name: Build & Package Plugin Zip
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Read Version Number
+        id: get_version
+        run: |
+          VERSION=$(cat VERSION | tr -d '\r\n ')
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Version detected: $VERSION"
+
+      - name: Prepare Clean Plugin Package Directory
+        run: |
+          mkdir -p dist/gnn-filehub-nextgen
+          cp -r gnn-filehub-nextgen.php inc assets VERSION dist/gnn-filehub-nextgen/
+          if [ -d "languages" ]; then cp -r languages dist/gnn-filehub-nextgen/; fi
+          if [ -f "README.md" ]; then cp README.md dist/gnn-filehub-nextgen/; fi
+
+      - name: Create Zip Archive
+        run: |
+          cd dist
+          zip -r "../gnn-filehub-nextgen-v${VERSION}.zip" gnn-filehub-nextgen
+          cd ..
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gnn-filehub-nextgen-v${{ env.VERSION }}
+          path: gnn-filehub-nextgen-v${{ env.VERSION }}.zip
+          retention-days: 90
+
+      - name: Create GitHub Release & Tag
+        if: ${{ inputs.create_github_release == true }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VERSION }}
+          name: Release v${{ env.VERSION }}
+          body: |
+            ## GNN FileHub NextGen v${{ env.VERSION }}
+            - %100 WordPress Core Native dosya yükleme ve bulut depolama eklentisi.
+            - Üretim ortamı için derlenmiş temiz eklenti zip paketi ektedir.
+          files: gnn-filehub-nextgen-v${{ env.VERSION }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

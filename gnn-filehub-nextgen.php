@@ -15,8 +15,12 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit; // Exit if accessed directly.
 }
 
+// Read Version Dynamically from VERSION File
+$filehub_version_path = plugin_dir_path( __FILE__ ) . 'VERSION';
+$filehub_version      = file_exists( $filehub_version_path ) ? trim( file_get_contents( $filehub_version_path ) ) : '1.0.0';
+
 // Define Plugin Constants
-define( 'GNN_FILEHUB_VERSION', '1.0.0' );
+define( 'GNN_FILEHUB_VERSION', $filehub_version );
 define( 'GNN_FILEHUB_FILE', __FILE__ );
 define( 'GNN_FILEHUB_PATH', plugin_dir_path( __FILE__ ) );
 define( 'GNN_FILEHUB_URL', plugin_dir_url( __FILE__ ) );
