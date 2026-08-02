@@ -10,7 +10,7 @@ require_once GNN_FILEHUB_PATH . 'inc/class-filehub-attachment.php';
 
 /**
  * Class FileHub_REST_API
- * Secure WP REST Controller for upload, list, delete, download, and password operations.
+ * Secure WP REST Controller for upload, list, delete, download, password, and register operations.
  */
 class FileHub_REST_API extends WP_REST_Controller {
 
@@ -52,6 +52,12 @@ class FileHub_REST_API extends WP_REST_Controller {
             'methods'             => WP_REST_Server::CREATABLE,
             'callback'            => array( $this, 'handle_change_password' ),
             'permission_callback' => array( $this, 'check_user_permission' ),
+        ) );
+
+        register_rest_route( $this->namespace, '/register', array(
+            'methods'             => WP_REST_Server::CREATABLE,
+            'callback'            => array( $this, 'handle_register_user' ),
+            'permission_callback' => '__return_true',
         ) );
     }
 
@@ -279,5 +285,73 @@ class FileHub_REST_API extends WP_REST_Controller {
         wp_set_auth_cookie( $user->ID );
 
         return new WP_REST_Response( array( 'success' => true, 'message' => __( 'Şifreniz başarıyla güncellendi.', 'gnn-filehub' ) ), 200 );
+    }
+
+    /**
+     * Handle Front-End User Registration via REST
+     */
+    public function handle_register_user( $request ) {
+        if ( is_user_logged_in() ) {
+            return new WP_REST_Response( array( 'error' => __( 'Zaten giriş yapmış durumdasınız.', 'gnn-filehub' ) ), 400 );
+        }
+
+        if ( ! get_option( 'users_can_register' ) ) {
+            return new WP_REST_Response( array( 'error' => __( 'Siteye yeni üye kaydı kapalıdır.', 'gnn-filehub' ) ), 403 );
+        }
+
+        $params           = $request->get_json_params();
+        $username         = isset( $params['username'] ) ? sanitize_user( trim( $params['username'] ) ) : '';
+        $email            = isset( $params['email'] ) ? sanitize_email( trim( $params['email'] ) ) : '';
+        $first_name       = isset( $params['first_name'] ) ? sanitize_text_field( trim( $params['first_name'] ) ) : '';
+        $last_name        = isset( $params['last_name'] ) ? sanitize_text_field( trim( $params['last_name'] ) ) : '';
+        $password         = isset( $params['password'] ) ? $params['password'] : '';
+        $confirm_password = isset( $params['confirm_password'] ) ? $params['confirm_password'] : '';
+
+        if ( empty( $username ) || empty( $email ) || empty( $password ) || empty( $confirm_password ) ) {
+            return new WP_REST_Response( array( 'error' => __( 'Lütfen zorunlu tüm alanları doldurun.', 'gnn-filehub' ) ), 400 );
+        }
+
+        if ( ! is_email( $email ) ) {
+            return new WP_REST_Response( array( 'error' => __( 'Geçersiz e-posta adresi.', 'gnn-filehub' ) ), 400 );
+        }
+
+        if ( $password !== $confirm_password ) {
+            return new WP_REST_Response( array( 'error' => __( 'Şifreler birbiriyle eşleşmiyor.', 'gnn-filehub' ) ), 400 );
+        }
+
+        if ( strlen( $password ) < 6 ) {
+            return new WP_REST_Response( array( 'error' => __( 'Şifre en az 6 karakter olmalıdır.', 'gnn-filehub' ) ), 400 );
+        }
+
+        if ( username_exists( $username ) ) {
+            return new WP_REST_Response( array( 'error' => __( 'Bu kullanıcı adı zaten kullanılmaktadır.', 'gnn-filehub' ) ), 400 );
+        }
+
+        if ( email_exists( $email ) ) {
+            return new WP_REST_Response( array( 'error' => __( 'Bu e-posta adresi zaten kayıtlıdır.', 'gnn-filehub' ) ), 400 );
+        }
+
+        $user_id = wp_insert_user( array(
+            'user_login'   => $username,
+            'user_email'   => $email,
+            'user_pass'    => $password,
+            'first_name'   => $first_name,
+            'last_name'    => $last_name,
+            'display_name' => trim( $first_name . ' ' . $last_name ) ?: $username,
+            'role'         => get_option( 'default_role', 'subscriber' ),
+        ) );
+
+        if ( is_wp_error( $user_id ) ) {
+            return new WP_REST_Response( array( 'error' => $user_id->get_error_message() ), 500 );
+        }
+
+        // Auto login user after registration
+        wp_set_current_user( $user_id );
+        wp_set_auth_cookie( $user_id );
+
+        return new WP_REST_Response( array(
+            'success' => true,
+            'message' => __( 'Tebrikler! Kaydınız başarıyla tamamlandı, yönlendiriliyorsunuz...', 'gnn-filehub' ),
+        ), 200 );
     }
 }

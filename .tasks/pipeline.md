@@ -1,6 +1,6 @@
 # Project Sprint Pipeline
 
-## Current Sprint: v0.2.0-alpha (Front-End User Screens & Live Manager Features Complete)
+## Current Sprint: v0.2.1-alpha (User Registration & Front-End Ecosystem Complete)
 
 ### 📌 Active Tasks
 - [x] **Task 1: Plugin Bootstrap & Core Class** (`gnn-filehub-nextgen.php`, `inc/class-filehub-core.php`) [Verified]
@@ -11,6 +11,7 @@
 - [x] **Task 6: Shortcodes & Public Drag-and-Drop Uploader** (`inc/class-filehub-shortcodes.php`, `assets/js/filehub-public.js`) [Verified]
 - [x] **Task 7: GitHub Automatic Update Checker & CI Release Builder** (`inc/class-filehub-updater.php`, `.github/workflows/release.yml`) [Verified]
 - [x] **Task 8: Front-End Screens (Login, Profile, Password Change, Live Search & AJAX Delete)** (`inc/class-filehub-shortcodes.php`, `assets/js/filehub-public.js`, `inc/class-filehub-rest-api.php`) [Verified]
+- [x] **Task 9: Front-End User Registration Shortcode & REST API** (`[filehub_register]`, `POST /wp-json/filehub/v1/register`) [Verified]
 
 ### 📋 Backlog
 - Chunked / Resumable upload handler for multi-gigabyte files.
@@ -18,4 +19,4 @@
 
 ### 🚦 Release Readiness
 - Status: 100% Complete & Verified (`php -l` passed on all 11 PHP files)
-- Next Step: Commit v0.2.0-alpha release.
+- Next Step: Commit v0.2.1-alpha release.

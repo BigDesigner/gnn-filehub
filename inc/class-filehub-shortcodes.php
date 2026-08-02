@@ -11,6 +11,7 @@ require_once GNN_FILEHUB_PATH . 'inc/class-filehub-attachment.php';
  * [filehub_uploader]
  * [filehub_manager]
  * [filehub_login]
+ * [filehub_register]
  * [filehub_profile]
  * [filehub_password_change]
  */
@@ -20,6 +21,7 @@ class FileHub_Shortcodes {
         add_shortcode( 'filehub_uploader', array( $this, 'render_uploader_shortcode' ) );
         add_shortcode( 'filehub_manager', array( $this, 'render_manager_shortcode' ) );
         add_shortcode( 'filehub_login', array( $this, 'render_login_shortcode' ) );
+        add_shortcode( 'filehub_register', array( $this, 'render_register_shortcode' ) );
         add_shortcode( 'filehub_profile', array( $this, 'render_profile_shortcode' ) );
         add_shortcode( 'filehub_password_change', array( $this, 'render_password_change_shortcode' ) );
         add_action( 'wp_enqueue_scripts', array( $this, 'register_public_scripts' ) );
@@ -136,6 +138,60 @@ class FileHub_Shortcodes {
             </div>
             <?php
         }
+        return ob_get_clean();
+    }
+
+    /**
+     * Render [filehub_register] Shortcode
+     */
+    public function render_register_shortcode( $atts ) {
+        if ( is_user_logged_in() ) {
+            return '<div class="filehub-card" style="max-width: 450px; margin: 20px 0;"><p>' . esc_html__( 'Zaten giriş yapmış durumdasınız.', 'gnn-filehub' ) . '</p></div>';
+        }
+
+        if ( ! get_option( 'users_can_register' ) ) {
+            return '<div class="filehub-card" style="max-width: 450px; margin: 20px 0;"><p>' . esc_html__( 'Siteye yeni üye kaydı şu an kapalıdır.', 'gnn-filehub' ) . '</p></div>';
+        }
+
+        wp_enqueue_style( 'filehub-admin-css' );
+        wp_enqueue_script( 'filehub-public-js' );
+
+        ob_start();
+        ?>
+        <div class="filehub-card" style="max-width: 450px; margin: 20px 0;">
+            <h3 style="text-align: center; margin-bottom: 20px;"><?php esc_html_e( 'Yeni Hesap Oluştur', 'gnn-filehub' ); ?></h3>
+            <form id="filehub-register-form">
+                <div style="margin-bottom: 12px;">
+                    <label for="filehub_reg_username" style="display: block; margin-bottom: 4px; font-weight: 600;"><?php esc_html_e( 'Kullanıcı Adı *', 'gnn-filehub' ); ?></label>
+                    <input type="text" id="filehub_reg_username" required style="width: 100%; padding: 8px; border: 1px solid #c3c4c7; border-radius: 4px;">
+                </div>
+                <div style="margin-bottom: 12px;">
+                    <label for="filehub_reg_email" style="display: block; margin-bottom: 4px; font-weight: 600;"><?php esc_html_e( 'E-posta Adresi *', 'gnn-filehub' ); ?></label>
+                    <input type="email" id="filehub_reg_email" required style="width: 100%; padding: 8px; border: 1px solid #c3c4c7; border-radius: 4px;">
+                </div>
+                <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+                    <div style="flex: 1;">
+                        <label for="filehub_reg_first_name" style="display: block; margin-bottom: 4px; font-weight: 600;"><?php esc_html_e( 'Adı', 'gnn-filehub' ); ?></label>
+                        <input type="text" id="filehub_reg_first_name" style="width: 100%; padding: 8px; border: 1px solid #c3c4c7; border-radius: 4px;">
+                    </div>
+                    <div style="flex: 1;">
+                        <label for="filehub_reg_last_name" style="display: block; margin-bottom: 4px; font-weight: 600;"><?php esc_html_e( 'Soyadı', 'gnn-filehub' ); ?></label>
+                        <input type="text" id="filehub_reg_last_name" style="width: 100%; padding: 8px; border: 1px solid #c3c4c7; border-radius: 4px;">
+                    </div>
+                </div>
+                <div style="margin-bottom: 12px;">
+                    <label for="filehub_reg_password" style="display: block; margin-bottom: 4px; font-weight: 600;"><?php esc_html_e( 'Şifre *', 'gnn-filehub' ); ?></label>
+                    <input type="password" id="filehub_reg_password" required minlength="6" style="width: 100%; padding: 8px; border: 1px solid #c3c4c7; border-radius: 4px;">
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label for="filehub_reg_confirm_password" style="display: block; margin-bottom: 4px; font-weight: 600;"><?php esc_html_e( 'Şifre (Tekrar) *', 'gnn-filehub' ); ?></label>
+                    <input type="password" id="filehub_reg_confirm_password" required minlength="6" style="width: 100%; padding: 8px; border: 1px solid #c3c4c7; border-radius: 4px;">
+                </div>
+                <button type="submit" class="button button-primary" style="width: 100%; padding: 8px; font-size: 1.05em;"><?php esc_html_e( 'Kayıt Ol', 'gnn-filehub' ); ?></button>
+            </form>
+            <p id="filehub-register-status" style="margin-top: 12px; font-weight: 600; text-align: center;"></p>
+        </div>
+        <?php
         return ob_get_clean();
     }
 

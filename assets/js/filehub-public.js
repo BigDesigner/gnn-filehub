@@ -1,4 +1,4 @@
-/* GNN FileHub NextGen - Zero Dependency Native Public Drag & Drop, Manager & Password JS */
+/* GNN FileHub NextGen - Zero Dependency Native Public Drag & Drop, Manager, Password & Register JS */
 document.addEventListener('DOMContentLoaded', function () {
   const dropZone = document.getElementById('filehub-dropzone');
   const fileInput = document.getElementById('filehub-file-input');
@@ -9,6 +9,8 @@ document.addEventListener('DOMContentLoaded', function () {
   const searchInput = document.getElementById('filehub-search-input');
   const passwordForm = document.getElementById('filehub-password-form');
   const passwordStatus = document.getElementById('filehub-password-status');
+  const registerForm = document.getElementById('filehub-register-form');
+  const registerStatus = document.getElementById('filehub-register-status');
 
   let cachedFilesData = [];
 
@@ -215,6 +217,64 @@ document.addEventListener('DOMContentLoaded', function () {
           if (passwordStatus) {
             passwordStatus.style.color = '#b32d2e';
             passwordStatus.textContent = 'Sunucu bağlantı hatası.';
+          }
+        });
+    });
+  }
+
+  // Front-End Registration Handler
+  if (registerForm) {
+    registerForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      const username = document.getElementById('filehub_reg_username').value;
+      const email = document.getElementById('filehub_reg_email').value;
+      const first_name = document.getElementById('filehub_reg_first_name').value;
+      const last_name = document.getElementById('filehub_reg_last_name').value;
+      const password = document.getElementById('filehub_reg_password').value;
+      const confirm_password = document.getElementById('filehub_reg_confirm_password').value;
+
+      if (registerStatus) {
+        registerStatus.style.color = '#1d2327';
+        registerStatus.textContent = 'Kayıt işlemi yapılıyor...';
+      }
+
+      fetch(filehub_vars.rest_url + 'filehub/v1/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-WP-Nonce': filehub_vars.nonce
+        },
+        body: JSON.stringify({
+          username: username,
+          email: email,
+          first_name: first_name,
+          last_name: last_name,
+          password: password,
+          confirm_password: confirm_password
+        })
+      })
+        .then(res => res.json())
+        .then(resp => {
+          if (resp.success) {
+            if (registerStatus) {
+              registerStatus.style.color = '#00a32a';
+              registerStatus.textContent = resp.message;
+            }
+            registerForm.reset();
+            setTimeout(() => {
+              window.location.reload();
+            }, 1500);
+          } else {
+            if (registerStatus) {
+              registerStatus.style.color = '#b32d2e';
+              registerStatus.textContent = resp.error || 'Kayıt başarısız.';
+            }
+          }
+        })
+        .catch(err => {
+          if (registerStatus) {
+            registerStatus.style.color = '#b32d2e';
+            registerStatus.textContent = 'Sunucu bağlantı hatası.';
           }
         });
     });
