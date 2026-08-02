@@ -46,6 +46,7 @@ class FileHub_Core {
         require_once GNN_FILEHUB_PATH . 'inc/class-filehub-rest-api.php';
         require_once GNN_FILEHUB_PATH . 'inc/class-filehub-admin.php';
         require_once GNN_FILEHUB_PATH . 'inc/class-filehub-shortcodes.php';
+        require_once GNN_FILEHUB_PATH . 'inc/class-filehub-updater.php';
     }
 
     /**
@@ -60,6 +61,7 @@ class FileHub_Core {
 
         if ( is_admin() ) {
             new FileHub_Admin();
+            new FileHub_Updater();
         }
     }
 
