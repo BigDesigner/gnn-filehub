@@ -13,7 +13,7 @@
     },
     {
       "step": "activatePlugin",
-      "pluginPath": "gnn-filehub-nextgen/gnn-filehub-nextgen.php"
+      "pluginPath": "gnn-filehub/gnn-filehub-nextgen.php"
     }
   ]
 }
