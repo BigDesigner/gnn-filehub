@@ -111,7 +111,9 @@ class FileHub_Shortcodes {
                     <p class="filehub-dropzone-title"><?php esc_html_e( 'Dosyaları buraya sürükleyin', 'gnn-filehub' ); ?></p>
                     <p class="filehub-dropzone-subtitle"><?php esc_html_e( 'veya bilgisayarınızdan seçmek için tıklayın', 'gnn-filehub' ); ?></p>
                     <input type="file" id="filehub-file-input" style="display: none;">
-                    <button type="button" class="button button-primary" onclick="document.getElementById('filehub-file-input').click();"><?php esc_html_e( 'Dosya Seç', 'gnn-filehub' ); ?></button>
+                    <form onsubmit="return false;">
+                        <button type="button" class="button button-primary" onclick="document.getElementById('filehub-file-input').click();"><?php esc_html_e( 'Dosya Seç', 'gnn-filehub' ); ?></button>
+                    </form>
                 </div>
 
                 <div id="filehub-progress-bar" class="filehub-progress-bar" style="display: none; margin-top: 15px;">
