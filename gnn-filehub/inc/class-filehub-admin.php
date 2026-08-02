@@ -33,7 +33,7 @@ class FileHub_Admin {
             'filehub',
             array( $this, 'render_admin_page' ),
             'dashicons-cloud-upload',
-            30
+            '79.103'
         );
 
         add_submenu_page(
