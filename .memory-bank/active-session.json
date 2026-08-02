@@ -1,0 +1,27 @@
+{
+  "schema_version": "1.1.0",
+  "session_id": "c82f91a0-4b21-419b-a621-e1293a95f9c4",
+  "status": "ACTIVE",
+  "mode": "Interactive",
+  "preferred_language": "Turkish",
+  "timestamp": "2026-08-02T21:03:50+03:00",
+  "active_branch": "main",
+  "last_commit": null,
+  "git_history_available": true,
+  "worktree_status": "untracked",
+  "current_sprint": {
+    "sprint_id": "v0.1.0-alpha",
+    "active_tasks": [
+      "Sentinel Memory Bank Bootstrap",
+      "Greenfield WordPress Core Native Plugin Setup"
+    ]
+  },
+  "tracked_memory_areas": {
+    "adr": ".memory-bank/adr/",
+    "changelog": ".memory-bank/changelog/",
+    "audits": ".memory-bank/bugs/",
+    "bugs": ".memory-bank/bugs/",
+    "tasks": ".tasks/",
+    "archive": ".archive/docs-migration/"
+  }
+}

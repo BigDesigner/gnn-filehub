@@ -1,0 +1,13 @@
+# OS & Editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Sentinel temporary lock & state files
+.memory-bank/.session.lock
+*.tmp.json
+
+# Environment / Logs
+*.log
+.env
