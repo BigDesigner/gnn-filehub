@@ -70,6 +70,28 @@ class FileHub_Admin {
             array(),
             GNN_FILEHUB_VERSION
         );
+
+        if ( isset( $_GET['tab'] ) && 'files' === $_GET['tab'] ) {
+            wp_enqueue_style(
+                'filehub-public-css',
+                GNN_FILEHUB_URL . 'assets/css/filehub-public.css',
+                array( 'filehub-admin-css' ),
+                GNN_FILEHUB_VERSION
+            );
+
+            wp_enqueue_script(
+                'filehub-public-js',
+                GNN_FILEHUB_URL . 'assets/js/filehub-public.js',
+                array(),
+                GNN_FILEHUB_VERSION,
+                true
+            );
+
+            wp_localize_script( 'filehub-public-js', 'filehub_vars', array(
+                'rest_url' => esc_url_raw( rest_url() ),
+                'nonce'    => wp_create_nonce( 'wp_rest' ),
+            ) );
+        }
     }
 
     /**
@@ -86,9 +108,9 @@ class FileHub_Admin {
         register_setting( 'filehub_pages_group', 'filehub_page_register' );
         register_setting( 'filehub_pages_group', 'filehub_page_login' );
         register_setting( 'filehub_pages_group', 'filehub_page_profile' );
-        register_setting( 'filehub_pages_group', 'filehub_page_password_change' );
         register_setting( 'filehub_pages_group', 'filehub_page_uploader' );
         register_setting( 'filehub_pages_group', 'filehub_page_manager' );
+        register_setting( 'filehub_pages_group', 'filehub_page_admin_files' );
 
         // Storage Driver Options
         register_setting( 'filehub_storage_group', 'filehub_storage_driver' );
@@ -112,7 +134,7 @@ class FileHub_Admin {
         }
         ?>
         <div class="wrap">
-            <h1 class="wp-heading-inline">GNN FileHub NextGen</h1>
+            <h1 class="wp-heading-inline">GNN Filehub</h1>
             <hr class="wp-header-end">
 
             <nav class="nav-tab-wrapper filehub-nav-tab-wrapper">
@@ -128,6 +150,9 @@ class FileHub_Admin {
                 <a href="?page=filehub&tab=storage" class="nav-tab <?php echo $active_tab === 'storage' ? 'nav-tab-active' : ''; ?>">
                     <span class="dashicons dashicons-cloud-upload" style="vertical-align: text-bottom;"></span> <?php esc_html_e( 'Depolama Sürücüleri', 'gnn-filehub' ); ?>
                 </a>
+                <a href="?page=filehub&tab=files" class="nav-tab <?php echo $active_tab === 'files' ? 'nav-tab-active' : ''; ?>">
+                    <span class="dashicons dashicons-media-default" style="vertical-align: text-bottom;"></span> <?php esc_html_e( 'Tüm Dosyalar', 'gnn-filehub' ); ?>
+                </a>
             </nav>
 
             <?php
@@ -140,6 +165,9 @@ class FileHub_Admin {
                     break;
                 case 'storage':
                     $this->render_tab_storage();
+                    break;
+                case 'files':
+                    $this->render_tab_files();
                     break;
                 case 'overview':
                 default:
@@ -306,10 +334,6 @@ class FileHub_Admin {
                 'title'     => __( 'Profilim', 'gnn-filehub' ),
                 'shortcode' => '[filehub_profile]',
             ),
-            'filehub_page_password_change' => array(
-                'title'     => __( 'Şifre Değiştir', 'gnn-filehub' ),
-                'shortcode' => '[filehub_password_change]',
-            ),
             'filehub_page_uploader'        => array(
                 'title'     => __( 'Dosya Yükle', 'gnn-filehub' ),
                 'shortcode' => '[filehub_uploader]',
@@ -317,6 +341,10 @@ class FileHub_Admin {
             'filehub_page_manager'         => array(
                 'title'     => __( 'Dosyalarım', 'gnn-filehub' ),
                 'shortcode' => '[filehub_manager]',
+            ),
+            'filehub_page_admin_files'     => array(
+                'title'     => __( 'Tüm Dosyalar', 'gnn-filehub' ),
+                'shortcode' => '[filehub_admin_files]',
             ),
         );
     }
@@ -422,7 +450,7 @@ class FileHub_Admin {
             <div class="filehub-card">
                 <h3><?php esc_html_e( 'Otomatik Sayfa Atamaları', 'gnn-filehub' ); ?></h3>
                 <p style="color: #646970; margin-bottom: 20px;">
-                    <?php esc_html_e( 'Aşağıdaki WordPress sayfalarını seçtiğinizde, kısa kodlar (shortcode) ilgili sayfalara otomatik olarak gömülür. Manuel kısa kod yazmak zorunda kalmazsınız.', 'gnn-filehub' ); ?>
+                    <?php esc_html_e( 'Aşağıdaki WordPress sayfalarını seçtiğinizde, kısa kodlar (shortcode) ilgili sayfalara otomatik olarak gömülür. Manuel kısa kod yazmak zorunda kalmazsınız. Şifre değiştirme formu artık ayrı bir sayfa gerektirmez; Profil sayfasının içinde otomatik olarak yer alır.', 'gnn-filehub' ); ?>
                 </p>
 
                 <table class="form-table">
@@ -469,20 +497,6 @@ class FileHub_Admin {
                         </td>
                     </tr>
                     <tr>
-                        <th scope="row"><label for="filehub_page_password_change"><?php esc_html_e( 'Şifre Değiştirme Sayfası [filehub_password_change]', 'gnn-filehub' ); ?></label></th>
-                        <td>
-                            <?php
-                            wp_dropdown_pages( array(
-                                'name'              => 'filehub_page_password_change',
-                                'selected'          => get_option( 'filehub_page_password_change', 0 ),
-                                'show_option_none'  => __( '-- Sayfa Seçin --', 'gnn-filehub' ),
-                                'option_none_value' => '0',
-                                'class'             => 'regular-text',
-                            ) );
-                            ?>
-                        </td>
-                    </tr>
-                    <tr>
                         <th scope="row"><label for="filehub_page_uploader"><?php esc_html_e( 'Dosya Yükleme Sayfası [filehub_uploader]', 'gnn-filehub' ); ?></label></th>
                         <td>
                             <?php
@@ -497,7 +511,7 @@ class FileHub_Admin {
                         </td>
                     </tr>
                     <tr>
-                        <th scope="row"><label for="filehub_page_manager"><?php esc_html_e( 'Dosya Yöneticisi Sayfası [filehub_manager]', 'gnn-filehub' ); ?></label></th>
+                        <th scope="row"><label for="filehub_page_manager"><?php esc_html_e( 'Dosyalarım Sayfası [filehub_manager]', 'gnn-filehub' ); ?></label></th>
                         <td>
                             <?php
                             wp_dropdown_pages( array(
@@ -508,6 +522,22 @@ class FileHub_Admin {
                                 'class'             => 'regular-text',
                             ) );
                             ?>
+                            <p class="description"><?php esc_html_e( 'Üyeler bu sayfada yalnızca kendi yükledikleri dosyaları görür ve silebilir.', 'gnn-filehub' ); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="filehub_page_admin_files"><?php esc_html_e( 'Tüm Dosyalar Sayfası (Admin) [filehub_admin_files]', 'gnn-filehub' ); ?></label></th>
+                        <td>
+                            <?php
+                            wp_dropdown_pages( array(
+                                'name'              => 'filehub_page_admin_files',
+                                'selected'          => get_option( 'filehub_page_admin_files', 0 ),
+                                'show_option_none'  => __( '-- Sayfa Seçin --', 'gnn-filehub' ),
+                                'option_none_value' => '0',
+                                'class'             => 'regular-text',
+                            ) );
+                            ?>
+                            <p class="description"><?php esc_html_e( 'Sadece yöneticilerin erişebildiği, tüm üyelerin yüklediği dosyaları listeleyen sayfa.', 'gnn-filehub' ); ?></p>
                         </td>
                     </tr>
                 </table>
@@ -613,6 +643,23 @@ class FileHub_Admin {
             updatePanels();
         })();
         </script>
+        <?php
+    }
+
+    /**
+     * Tab 5: All Members' Files (Admin-Only Backend View)
+     */
+    private function render_tab_files() {
+        ?>
+        <div class="filehub-card filehub-manager" style="margin: 20px 0;">
+            <div class="filehub-manager-toolbar">
+                <h3 style="margin: 0;"><?php esc_html_e( 'Tüm Üye Dosyaları', 'gnn-filehub' ); ?></h3>
+                <input type="text" id="filehub-search-input" class="filehub-search-input" placeholder="<?php esc_attr_e( 'Dosya veya yükleyen ara...', 'gnn-filehub' ); ?>">
+            </div>
+            <div id="filehub-file-list" data-scope="all">
+                <p><?php esc_html_e( 'Yükleniyor...', 'gnn-filehub' ); ?></p>
+            </div>
+        </div>
         <?php
     }
 

@@ -157,10 +157,10 @@ class FileHub_Updater {
         }
 
         return (object) array(
-            'name'          => 'GNN FileHub NextGen',
+            'name'          => 'GNN Filehub',
             'slug'          => $plugin_folder,
             'version'       => $release->version,
-            'author'        => 'GNN Team',
+            'author'        => 'BigDesigner',
             'homepage'      => 'https://gnn.com.tr',
             'download_link' => $release->download_url,
             'sections'      => array(

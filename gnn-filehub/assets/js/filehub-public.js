@@ -183,7 +183,8 @@ document.addEventListener('DOMContentLoaded', function () {
   // File Manager & Live Search
   function fetchFileList() {
     if (!fileListContainer) return;
-    fetch(filehub_vars.rest_url + 'filehub/v1/files', {
+    const scope = fileListContainer.getAttribute('data-scope') || 'own';
+    fetch(filehub_vars.rest_url + 'filehub/v1/files?scope=' + encodeURIComponent(scope), {
       headers: {
         'X-WP-Nonce': filehub_vars.nonce
       }
@@ -199,7 +200,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function renderFileList(items) {
     if (!fileListContainer) return;
-    let html = '<table class="widefat striped"><thead><tr><th>Dosya Adı</th><th>Boyut</th><th>Sürücü</th><th>Yükleyen</th><th>İndirme</th><th>İşlem</th></tr></thead><tbody>';
+    let html = '<div class="filehub-table-wrap"><table class="filehub-table"><thead><tr><th>Dosya Adı</th><th>Boyut</th><th>Sürücü</th><th>Yükleyen</th><th>İndirme</th><th>İşlem</th></tr></thead><tbody>';
     if (items.length === 0) {
       html += '<tr><td colspan="6" style="text-align:center; padding: 20px;">Dosya bulunamadı.</td></tr>';
     } else {
@@ -218,7 +219,7 @@ document.addEventListener('DOMContentLoaded', function () {
         </tr>`;
       });
     }
-    html += '</tbody></table>';
+    html += '</tbody></table></div>';
     fileListContainer.innerHTML = html;
 
     // Attach Delete Event Listeners

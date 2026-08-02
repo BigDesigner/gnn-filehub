@@ -1,4 +1,4 @@
-# GNN FileHub NextGen - WordPress Plugin
+# GNN Filehub - WordPress Plugin
 
 Ultra-fast, zero-dependency WordPress File Management plugin supporting Local Protected Storage, Cloudflare R2, Google Drive, Chunked Resumable Uploads, and Automatic Page Assignments.
 

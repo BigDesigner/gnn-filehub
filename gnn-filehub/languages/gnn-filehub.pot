@@ -1,10 +1,10 @@
-# Copyright (C) 2026 GNN Team
-# This file is distributed under the same license as the GNN FileHub NextGen plugin.
+# Copyright (C) 2026 BigDesigner
+# This file is distributed under the same license as the GNN Filehub plugin.
 msgid ""
 msgstr ""
-"Project-Id-Version: GNN FileHub NextGen 1.0.1\n"
+"Project-Id-Version: GNN Filehub 1.0.1\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/gnn-filehub\n"
-"Last-Translator: GNN Team <info@gnn.com.tr>\n"
+"Last-Translator: BigDesigner <info@gnn.com.tr>\n"
 "Language-Team: Turkish <info@gnn.com.tr>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -15,7 +15,7 @@ msgstr ""
 "X-Domain: gnn-filehub\n"
 
 #. Plugin Name of the plugin
-msgid "GNN FileHub NextGen"
+msgid "GNN Filehub"
 msgstr ""
 
 #. Plugin URI of the plugin
@@ -27,7 +27,7 @@ msgid "100% WordPress Core Native, zero-dependency file upload and multi-cloud s
 msgstr ""
 
 #. Author of the plugin
-msgid "GNN Team"
+msgid "BigDesigner"
 msgstr ""
 
 #: gnn-filehub-nextgen.php:25

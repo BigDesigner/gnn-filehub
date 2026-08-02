@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "wp-playground",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["@wp-playground/cli", "start", "--skip-browser", "--port=9400"],
+      "port": 9400
+    }
+  ]
+}

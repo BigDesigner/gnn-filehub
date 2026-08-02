@@ -1,12 +1,66 @@
-/* GNN FileHub NextGen - Modern WP Admin Tabbed Layout & Pure CSS Toggles */
+/* GNN Filehub - Modern WP Admin Tabbed Layout & Pure CSS Toggles */
 
 :root {
   --filehub-theme-color: var(--wp-admin-theme-color, #2271b1);
+  --filehub-bg: #ffffff;
+  --filehub-bg-soft: #fafafa;
+  --filehub-bg-elevated: #f0f6fc;
+  --filehub-border: #c3c4c7;
+  --filehub-border-soft: #f0f0f1;
+  --filehub-text: #1d2327;
+  --filehub-text-muted: #646970;
+  --filehub-progress-bg: #f0f0f1;
+  --filehub-input-bg: #ffffff;
+}
+
+/* Dark mode: auto-adapt for front-end pages (theme dark mode / OS prefers-color-scheme).
+   The .wrap selector (wp-admin page wrapper) is excluded so the WP Admin panel keeps its
+   normal light styling regardless of the visiting admin's OS color scheme. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --filehub-bg: #1e1e1e;
+    --filehub-bg-soft: #2a2a2a;
+    --filehub-bg-elevated: #24303d;
+    --filehub-border: #3c3c3c;
+    --filehub-border-soft: #333333;
+    --filehub-text: #f0f0f1;
+    --filehub-text-muted: #a7aaad;
+    --filehub-progress-bg: #333333;
+    --filehub-input-bg: #2a2a2a;
+  }
+
+  .wrap {
+    --filehub-bg: #ffffff;
+    --filehub-bg-soft: #fafafa;
+    --filehub-bg-elevated: #f0f6fc;
+    --filehub-border: #c3c4c7;
+    --filehub-border-soft: #f0f0f1;
+    --filehub-text: #1d2327;
+    --filehub-text-muted: #646970;
+    --filehub-progress-bg: #f0f0f1;
+    --filehub-input-bg: #ffffff;
+  }
+}
+
+/* Same override for themes/plugins that toggle dark mode via a class/attribute
+   instead of relying on the OS-level prefers-color-scheme signal. */
+.dark-mode :root,
+[data-theme="dark"],
+html.dark {
+  --filehub-bg: #1e1e1e;
+  --filehub-bg-soft: #2a2a2a;
+  --filehub-bg-elevated: #24303d;
+  --filehub-border: #3c3c3c;
+  --filehub-border-soft: #333333;
+  --filehub-text: #f0f0f1;
+  --filehub-text-muted: #a7aaad;
+  --filehub-progress-bg: #333333;
+  --filehub-input-bg: #2a2a2a;
 }
 
 /* Tab Navigation Styling */
 .filehub-nav-tab-wrapper {
-  border-bottom: 1px solid #c3c4c7;
+  border-bottom: 1px solid var(--filehub-border);
   margin-bottom: 20px;
 }
 
@@ -18,19 +72,20 @@
 }
 
 .filehub-card {
-  background: #fff;
-  border: 1px solid #c3c4c7;
+  background: var(--filehub-bg);
+  border: 1px solid var(--filehub-border);
   border-radius: 6px;
   padding: 20px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  color: var(--filehub-text);
 }
 
 .filehub-card h3 {
   margin-top: 0;
   margin-bottom: 15px;
-  color: #1d2327;
+  color: var(--filehub-text);
   font-size: 1.1em;
-  border-bottom: 1px solid #f0f0f1;
+  border-bottom: 1px solid var(--filehub-border-soft);
   padding-bottom: 10px;
 }
 
@@ -44,7 +99,7 @@
 .filehub-progress-bar {
   width: 100%;
   height: 12px;
-  background-color: #f0f0f1;
+  background-color: var(--filehub-progress-bg);
   border-radius: 6px;
   overflow: hidden;
   margin-top: 10px;
@@ -113,12 +168,13 @@
 }
 
 .filehub-driver-card {
-  border: 2px solid #c3c4c7;
+  border: 2px solid var(--filehub-border);
   border-radius: 6px;
   padding: 15px;
   cursor: pointer;
   transition: all 0.2s ease;
-  background: #fafafa;
+  background: var(--filehub-bg-soft);
+  color: var(--filehub-text);
 }
 
 .filehub-driver-card:hover {
@@ -127,9 +183,22 @@
 
 .filehub-driver-card.selected {
   border-color: var(--filehub-theme-color);
-  background: #f0f6fc;
+  background: var(--filehub-bg-elevated);
 }
 
 .filehub-driver-card input[type="radio"] {
   margin-right: 8px;
+}
+
+.filehub-card input[type="text"],
+.filehub-card input[type="password"],
+.filehub-card input[type="email"],
+.filehub-card input[type="number"] {
+  background: var(--filehub-input-bg);
+  color: var(--filehub-text);
+  border-color: var(--filehub-border);
+}
+
+.filehub-card .description {
+  color: var(--filehub-text-muted);
 }

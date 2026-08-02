@@ -279,6 +279,10 @@ class FileHub_REST_API extends WP_REST_Controller {
         $current_user_id = get_current_user_id();
         $is_admin        = current_user_can( 'manage_options' );
 
+        // Only admins may request the cross-user "all files" scope; everyone else always sees their own files only.
+        $requested_scope = (string) $request->get_param( 'scope' );
+        $scope           = ( 'all' === $requested_scope && $is_admin ) ? 'all' : 'own';
+
         $query_args = array(
             'post_type'      => 'attachment',
             'post_status'    => 'inherit',
@@ -286,7 +290,7 @@ class FileHub_REST_API extends WP_REST_Controller {
             'meta_key'       => '_filehub_storage_driver',
         );
 
-        if ( ! $is_admin ) {
+        if ( 'own' === $scope ) {
             $query_args['author'] = $current_user_id;
         }
 

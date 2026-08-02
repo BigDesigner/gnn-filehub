@@ -68,7 +68,7 @@ jobs:
           tag_name: v${{ env.VERSION }}
           name: Release v${{ env.VERSION }}
           body: |
-            ## GNN FileHub NextGen v${{ env.VERSION }}
+            ## GNN Filehub v${{ env.VERSION }}
             - %100 WordPress Core Native dosya yükleme ve bulut depolama eklentisi.
             - Üretim ortamı için derlenmiş temiz eklenti zip paketi ektedir.
           files: gnn-filehub-v${{ env.VERSION }}.zip

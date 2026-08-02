@@ -1,10 +1,10 @@
 <?php
 /**
- * Plugin Name:       GNN FileHub NextGen
+ * Plugin Name:       GNN Filehub
  * Plugin URI:        https://gnn.com.tr
  * Description:       100% WordPress Core Native, zero-dependency file upload and multi-cloud storage management plugin.
  * Version:           1.0.1
- * Author:            GNN Team
+ * Author:            BigDesigner
  * Text Domain:       gnn-filehub
  * Domain Path:       /languages
  * Requires at least: 6.0
