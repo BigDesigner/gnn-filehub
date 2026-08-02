@@ -2,7 +2,7 @@
 # This file is distributed under the same license as the GNN FileHub NextGen plugin.
 msgid ""
 msgstr ""
-"Project-Id-Version: GNN FileHub NextGen 1.0.0\n"
+"Project-Id-Version: GNN FileHub NextGen 1.0.1\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/gnn-filehub\n"
 "Last-Translator: GNN Team <info@gnn.com.tr>\n"
 "Language-Team: Turkish <info@gnn.com.tr>\n"

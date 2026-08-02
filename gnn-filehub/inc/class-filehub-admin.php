@@ -15,6 +15,7 @@ class FileHub_Admin {
         add_action( 'admin_menu', array( $this, 'add_admin_menu' ) );
         add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
         add_action( 'admin_init', array( $this, 'register_settings' ) );
+        add_action( 'admin_init', array( $this, 'maybe_create_missing_pages' ) );
 
         add_action( 'show_user_profile', array( $this, 'render_user_profile_fields' ) );
         add_action( 'edit_user_profile', array( $this, 'render_user_profile_fields' ) );
@@ -76,29 +77,29 @@ class FileHub_Admin {
      */
     public function register_settings() {
         // General & Security Options
-        register_setting( 'filehub_settings_group', 'filehub_guest_upload' );
-        register_setting( 'filehub_settings_group', 'filehub_strict_mime' );
-        register_setting( 'filehub_settings_group', 'filehub_auto_rename' );
-        register_setting( 'filehub_settings_group', 'filehub_allowed_extensions' );
+        register_setting( 'filehub_general_group', 'filehub_guest_upload' );
+        register_setting( 'filehub_general_group', 'filehub_strict_mime' );
+        register_setting( 'filehub_general_group', 'filehub_auto_rename' );
+        register_setting( 'filehub_general_group', 'filehub_allowed_extensions' );
 
         // Automatic Page Assignments
-        register_setting( 'filehub_settings_group', 'filehub_page_register' );
-        register_setting( 'filehub_settings_group', 'filehub_page_login' );
-        register_setting( 'filehub_settings_group', 'filehub_page_profile' );
-        register_setting( 'filehub_settings_group', 'filehub_page_password_change' );
-        register_setting( 'filehub_settings_group', 'filehub_page_uploader' );
-        register_setting( 'filehub_settings_group', 'filehub_page_manager' );
+        register_setting( 'filehub_pages_group', 'filehub_page_register' );
+        register_setting( 'filehub_pages_group', 'filehub_page_login' );
+        register_setting( 'filehub_pages_group', 'filehub_page_profile' );
+        register_setting( 'filehub_pages_group', 'filehub_page_password_change' );
+        register_setting( 'filehub_pages_group', 'filehub_page_uploader' );
+        register_setting( 'filehub_pages_group', 'filehub_page_manager' );
 
         // Storage Driver Options
-        register_setting( 'filehub_settings_group', 'filehub_storage_driver' );
-        register_setting( 'filehub_settings_group', 'filehub_r2_account_id' );
-        register_setting( 'filehub_settings_group', 'filehub_r2_access_key' );
-        register_setting( 'filehub_settings_group', 'filehub_r2_secret_key' );
-        register_setting( 'filehub_settings_group', 'filehub_r2_bucket' );
-        register_setting( 'filehub_settings_group', 'filehub_gdrive_client_id' );
-        register_setting( 'filehub_settings_group', 'filehub_gdrive_client_secret' );
-        register_setting( 'filehub_settings_group', 'filehub_gdrive_refresh_token' );
-        register_setting( 'filehub_settings_group', 'filehub_gdrive_folder_id' );
+        register_setting( 'filehub_storage_group', 'filehub_storage_driver' );
+        register_setting( 'filehub_storage_group', 'filehub_r2_account_id' );
+        register_setting( 'filehub_storage_group', 'filehub_r2_access_key' );
+        register_setting( 'filehub_storage_group', 'filehub_r2_secret_key' );
+        register_setting( 'filehub_storage_group', 'filehub_r2_bucket' );
+        register_setting( 'filehub_storage_group', 'filehub_gdrive_client_id' );
+        register_setting( 'filehub_storage_group', 'filehub_gdrive_client_secret' );
+        register_setting( 'filehub_storage_group', 'filehub_gdrive_refresh_token' );
+        register_setting( 'filehub_storage_group', 'filehub_gdrive_folder_id' );
     }
 
     /**
@@ -154,14 +155,19 @@ class FileHub_Admin {
      * Tab 1: Overview & Analytics
      */
     private function render_tab_overview() {
-        $stats        = FileHub_Attachment::get_system_stats();
-        $r2_free_gb   = 10;
-        $r2_used_gb   = round( $stats['driver_bytes']['r2'] / ( 1024 * 1024 * 1024 ), 2 );
-        $r2_pct       = min( 100, round( ( $r2_used_gb / $r2_free_gb ) * 100, 1 ) );
+        $stats = FileHub_Attachment::get_system_stats();
 
-        $gdrive_free_gb = 15;
-        $gdrive_used_gb = round( $stats['driver_bytes']['gdrive'] / ( 1024 * 1024 * 1024 ), 2 );
-        $gdrive_pct     = min( 100, round( ( $gdrive_used_gb / $gdrive_free_gb ) * 100, 1 ) );
+        $local_used_bytes = $stats['driver_bytes']['local'];
+
+        $r2_configured = get_option( 'filehub_r2_account_id' ) && get_option( 'filehub_r2_access_key' ) && get_option( 'filehub_r2_secret_key' ) && get_option( 'filehub_r2_bucket' );
+        $r2_free_gb    = 10;
+        $r2_used_gb    = round( $stats['driver_bytes']['r2'] / ( 1024 * 1024 * 1024 ), 2 );
+        $r2_pct        = min( 100, round( ( $r2_used_gb / $r2_free_gb ) * 100, 1 ) );
+
+        $gdrive_configured = get_option( 'filehub_gdrive_client_id' ) && get_option( 'filehub_gdrive_client_secret' ) && get_option( 'filehub_gdrive_refresh_token' );
+        $gdrive_free_gb    = 15;
+        $gdrive_used_gb    = round( $stats['driver_bytes']['gdrive'] / ( 1024 * 1024 * 1024 ), 2 );
+        $gdrive_pct        = min( 100, round( ( $gdrive_used_gb / $gdrive_free_gb ) * 100, 1 ) );
         ?>
         <div class="filehub-dashboard-grid">
             <div class="filehub-card">
@@ -182,23 +188,42 @@ class FileHub_Admin {
             </div>
         </div>
 
-        <h2 style="margin-top: 30px; font-weight: 600;"><?php esc_html_e( 'Bulut Depolama Kota Takibi', 'gnn-filehub' ); ?></h2>
+        <h2 style="margin-top: 30px; font-weight: 600;"><?php esc_html_e( 'Depolama Kota Takibi', 'gnn-filehub' ); ?></h2>
         <div class="filehub-dashboard-grid">
             <div class="filehub-card">
-                <h3>Cloudflare R2 (10 GB Free Tier Tracker)</h3>
-                <p><?php printf( esc_html__( '%s GB / 10 GB (%%%s)', 'gnn-filehub' ), $r2_used_gb, $r2_pct ); ?></p>
-                <div class="filehub-progress-bar">
-                    <div class="filehub-progress-fill" style="width: <?php echo esc_attr( $r2_pct ); ?>%;"></div>
-                </div>
+                <h3><?php esc_html_e( 'Yerel Depolama (Sunucu Diski)', 'gnn-filehub' ); ?></h3>
+                <p><?php echo esc_html( size_format( $local_used_bytes ) ); ?> <?php esc_html_e( 'kullanılıyor', 'gnn-filehub' ); ?></p>
             </div>
 
-            <div class="filehub-card">
-                <h3>Google Drive (15 GB Free Tier Tracker)</h3>
-                <p><?php printf( esc_html__( '%s GB / 15 GB (%%%s)', 'gnn-filehub' ), $gdrive_used_gb, $gdrive_pct ); ?></p>
-                <div class="filehub-progress-bar">
-                    <div class="filehub-progress-fill" style="width: <?php echo esc_attr( $gdrive_pct ); ?>%;"></div>
+            <?php if ( $r2_configured ) : ?>
+                <div class="filehub-card">
+                    <h3>Cloudflare R2 (10 GB Free Tier Tracker)</h3>
+                    <p><?php printf( esc_html__( '%s GB / 10 GB (%%%s)', 'gnn-filehub' ), $r2_used_gb, $r2_pct ); ?></p>
+                    <div class="filehub-progress-bar">
+                        <div class="filehub-progress-fill" style="width: <?php echo esc_attr( $r2_pct ); ?>%;"></div>
+                    </div>
                 </div>
-            </div>
+            <?php else : ?>
+                <div class="filehub-card">
+                    <h3>Cloudflare R2</h3>
+                    <p class="description"><?php esc_html_e( 'Henüz yapılandırılmadı. API bilgilerini "Depolama Sürücüleri" sekmesinden girin.', 'gnn-filehub' ); ?></p>
+                </div>
+            <?php endif; ?>
+
+            <?php if ( $gdrive_configured ) : ?>
+                <div class="filehub-card">
+                    <h3>Google Drive (15 GB Free Tier Tracker)</h3>
+                    <p><?php printf( esc_html__( '%s GB / 15 GB (%%%s)', 'gnn-filehub' ), $gdrive_used_gb, $gdrive_pct ); ?></p>
+                    <div class="filehub-progress-bar">
+                        <div class="filehub-progress-fill" style="width: <?php echo esc_attr( $gdrive_pct ); ?>%;"></div>
+                    </div>
+                </div>
+            <?php else : ?>
+                <div class="filehub-card">
+                    <h3>Google Drive</h3>
+                    <p class="description"><?php esc_html_e( 'Henüz yapılandırılmadı. API bilgilerini "Depolama Sürücüleri" sekmesinden girin.', 'gnn-filehub' ); ?></p>
+                </div>
+            <?php endif; ?>
         </div>
         <?php
     }
@@ -213,7 +238,7 @@ class FileHub_Admin {
         ?>
         <form method="post" action="options.php">
             <?php
-            settings_fields( 'filehub_settings_group' );
+            settings_fields( 'filehub_general_group' );
             ?>
             <div class="filehub-card">
                 <h3><?php esc_html_e( 'Genel & Güvenlik Yapılandırması', 'gnn-filehub' ); ?></h3>
@@ -263,12 +288,137 @@ class FileHub_Admin {
     }
 
     /**
+     * Required Page Assignments Configuration Map
+     *
+     * @return array
+     */
+    private function get_required_pages_config(): array {
+        return array(
+            'filehub_page_register'        => array(
+                'title'     => __( 'Kayıt Ol', 'gnn-filehub' ),
+                'shortcode' => '[filehub_register]',
+            ),
+            'filehub_page_login'           => array(
+                'title'     => __( 'Giriş Yap', 'gnn-filehub' ),
+                'shortcode' => '[filehub_login]',
+            ),
+            'filehub_page_profile'         => array(
+                'title'     => __( 'Profilim', 'gnn-filehub' ),
+                'shortcode' => '[filehub_profile]',
+            ),
+            'filehub_page_password_change' => array(
+                'title'     => __( 'Şifre Değiştir', 'gnn-filehub' ),
+                'shortcode' => '[filehub_password_change]',
+            ),
+            'filehub_page_uploader'        => array(
+                'title'     => __( 'Dosya Yükle', 'gnn-filehub' ),
+                'shortcode' => '[filehub_uploader]',
+            ),
+            'filehub_page_manager'         => array(
+                'title'     => __( 'Dosyalarım', 'gnn-filehub' ),
+                'shortcode' => '[filehub_manager]',
+            ),
+        );
+    }
+
+    /**
+     * Handle "Otomatik Sayfa Oluştur" Form Submission
+     */
+    public function maybe_create_missing_pages() {
+        if ( ! isset( $_POST['filehub_create_pages_nonce'] ) || ! wp_verify_nonce( $_POST['filehub_create_pages_nonce'], 'filehub_create_pages' ) ) {
+            return;
+        }
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            return;
+        }
+
+        $created = $this->create_missing_pages();
+
+        wp_safe_redirect(
+            add_query_arg(
+                array(
+                    'page'                    => 'filehub',
+                    'tab'                     => 'pages',
+                    'filehub_pages_created'   => $created,
+                ),
+                admin_url( 'admin.php' )
+            )
+        );
+        exit;
+    }
+
+    /**
+     * Create any Missing/Unassigned Required Pages (WooCommerce-style Auto Setup)
+     *
+     * @return int Number of pages created.
+     */
+    private function create_missing_pages(): int {
+        $created = 0;
+
+        foreach ( $this->get_required_pages_config() as $option_name => $config ) {
+            $page_id = (int) get_option( $option_name, 0 );
+            $page    = $page_id ? get_post( $page_id ) : null;
+
+            if ( $page && 'page' === $page->post_type && 'trash' !== $page->post_status ) {
+                continue;
+            }
+
+            $new_page_id = wp_insert_post(
+                array(
+                    'post_title'   => $config['title'],
+                    'post_content' => $config['shortcode'],
+                    'post_status'  => 'publish',
+                    'post_type'    => 'page',
+                )
+            );
+
+            if ( $new_page_id && ! is_wp_error( $new_page_id ) ) {
+                update_option( $option_name, $new_page_id );
+                $created++;
+            }
+        }
+
+        return $created;
+    }
+
+    /**
      * Tab 3: Automatic Page Assignments
      */
     private function render_tab_pages() {
         ?>
+        <?php if ( isset( $_GET['filehub_pages_created'] ) ) : ?>
+            <?php $created_count = (int) $_GET['filehub_pages_created']; ?>
+            <div class="notice notice-success is-dismissible">
+                <p>
+                    <?php
+                    if ( $created_count > 0 ) {
+                        printf(
+                            /* translators: %d: number of pages created */
+                            esc_html__( '%d eksik sayfa otomatik olarak oluşturuldu ve atandı.', 'gnn-filehub' ),
+                            $created_count
+                        );
+                    } else {
+                        esc_html_e( 'Tüm sayfalar zaten atanmış, yeni sayfa oluşturulmadı.', 'gnn-filehub' );
+                    }
+                    ?>
+                </p>
+            </div>
+        <?php endif; ?>
+
+        <form method="post" action="">
+            <?php wp_nonce_field( 'filehub_create_pages', 'filehub_create_pages_nonce' ); ?>
+            <div class="filehub-card" style="margin-bottom: 20px;">
+                <h3><?php esc_html_e( 'Hızlı Kurulum', 'gnn-filehub' ); ?></h3>
+                <p style="color: #646970; margin-bottom: 15px;">
+                    <?php esc_html_e( 'Eksik veya atanmamış sayfaları tek tıkla otomatik olarak oluşturur ve ilgili kısa kodları atar.', 'gnn-filehub' ); ?>
+                </p>
+                <?php submit_button( __( 'Eksik Sayfaları Otomatik Oluştur', 'gnn-filehub' ), 'secondary', 'filehub_create_pages', false ); ?>
+            </div>
+        </form>
+
         <form method="post" action="options.php">
-            <?php settings_fields( 'filehub_settings_group' ); ?>
+            <?php settings_fields( 'filehub_pages_group' ); ?>
             <div class="filehub-card">
                 <h3><?php esc_html_e( 'Otomatik Sayfa Atamaları', 'gnn-filehub' ); ?></h3>
                 <p style="color: #646970; margin-bottom: 20px;">
@@ -375,7 +525,7 @@ class FileHub_Admin {
         ?>
         <form method="post" action="options.php">
             <?php
-            settings_fields( 'filehub_settings_group' );
+            settings_fields( 'filehub_storage_group' );
             ?>
             <div class="filehub-card">
                 <h3><?php esc_html_e( 'Aktif Depolama Sürücü Seçimi', 'gnn-filehub' ); ?></h3>
@@ -400,7 +550,7 @@ class FileHub_Admin {
                 </div>
             </div>
 
-            <div class="filehub-card" style="margin-top: 20px;">
+            <div class="filehub-card filehub-storage-panel" data-driver="r2" style="margin-top: 20px; <?php echo $driver !== 'r2' ? 'display:none;' : ''; ?>">
                 <h3>Cloudflare R2 API Bilgileri</h3>
                 <table class="form-table">
                     <tr>
@@ -422,7 +572,7 @@ class FileHub_Admin {
                 </table>
             </div>
 
-            <div class="filehub-card" style="margin-top: 20px;">
+            <div class="filehub-card filehub-storage-panel" data-driver="gdrive" style="margin-top: 20px; <?php echo $driver !== 'gdrive' ? 'display:none;' : ''; ?>">
                 <h3>Google Drive API v3 Bilgileri</h3>
                 <table class="form-table">
                     <tr>
@@ -446,6 +596,23 @@ class FileHub_Admin {
 
             <?php submit_button( __( 'Depolama Ayarlarını Kaydet', 'gnn-filehub' ) ); ?>
         </form>
+        <script>
+        (function() {
+            var radios = document.querySelectorAll('input[name="filehub_storage_driver"]');
+            var panels = document.querySelectorAll('.filehub-storage-panel');
+            function updatePanels() {
+                var selected = document.querySelector('input[name="filehub_storage_driver"]:checked');
+                var value = selected ? selected.value : 'local';
+                panels.forEach(function( panel ) {
+                    panel.style.display = panel.getAttribute('data-driver') === value ? '' : 'none';
+                });
+            }
+            radios.forEach(function( radio ) {
+                radio.addEventListener('change', updatePanels);
+            });
+            updatePanels();
+        })();
+        </script>
         <?php
     }
 
