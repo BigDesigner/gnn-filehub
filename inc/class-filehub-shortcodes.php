@@ -7,13 +7,7 @@ require_once GNN_FILEHUB_PATH . 'inc/class-filehub-attachment.php';
 
 /**
  * Class FileHub_Shortcodes
- * Registers public shortcodes:
- * [filehub_uploader]
- * [filehub_manager]
- * [filehub_login]
- * [filehub_register]
- * [filehub_profile]
- * [filehub_password_change]
+ * Registers public shortcodes & automatic page content injection.
  */
 class FileHub_Shortcodes {
 
@@ -25,6 +19,41 @@ class FileHub_Shortcodes {
         add_shortcode( 'filehub_profile', array( $this, 'render_profile_shortcode' ) );
         add_shortcode( 'filehub_password_change', array( $this, 'render_password_change_shortcode' ) );
         add_action( 'wp_enqueue_scripts', array( $this, 'register_public_scripts' ) );
+
+        // WooCommerce-style Automatic Shortcode Injection on Assigned Pages
+        add_filter( 'the_content', array( $this, 'auto_inject_shortcodes' ) );
+    }
+
+    /**
+     * Automatic Shortcode Injection for WooCommerce-style Assigned Pages
+     */
+    public function auto_inject_shortcodes( $content ) {
+        if ( ! is_singular( 'page' ) || ! in_the_loop() || ! is_main_query() ) {
+            return $content;
+        }
+
+        $current_page_id = get_the_ID();
+
+        $pages_map = array(
+            'filehub_page_register'        => '[filehub_register]',
+            'filehub_page_login'           => '[filehub_login]',
+            'filehub_page_profile'         => '[filehub_profile]',
+            'filehub_page_password_change' => '[filehub_password_change]',
+            'filehub_page_uploader'        => '[filehub_uploader]',
+            'filehub_page_manager'         => '[filehub_manager]',
+        );
+
+        foreach ( $pages_map as $option_name => $shortcode ) {
+            $assigned_page_id = (int) get_option( $option_name, 0 );
+            if ( $assigned_page_id > 0 && $assigned_page_id === $current_page_id ) {
+                if ( false === strpos( $content, $shortcode ) ) {
+                    $content .= "\n" . do_shortcode( $shortcode );
+                }
+                break;
+            }
+        }
+
+        return $content;
     }
 
     /**

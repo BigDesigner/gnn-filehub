@@ -10,8 +10,9 @@
 - **2026-08-02:** **Task 5 Completed:** Created `inc/class-filehub-admin.php` and `assets/css/filehub-admin.css`.
 - **2026-08-02:** **Task 6 Completed:** Created `inc/class-filehub-shortcodes.php` and `assets/js/filehub-public.js`.
 - **2026-08-02:** **Task 7 Completed:** Created GitHub Auto-Updater (`inc/class-filehub-updater.php`) and `.github/workflows/release.yml`.
-- **2026-08-02:** **Task 8 Completed:** Added `[filehub_login]`, `[filehub_profile]`, `[filehub_password_change]` shortcodes and added Live Search & AJAX Delete functionality to `[filehub_manager]`.
-- **2026-08-02:** **Task 9 Completed:** Added `[filehub_register]` shortcode and `POST /wp-json/filehub/v1/register` REST endpoint with auto-login after successful registration.
+- **2026-08-02:** **Task 8 Completed:** Added `[filehub_login]`, `[filehub_profile]`, `[filehub_password_change]` shortcodes and Live Search & AJAX Delete.
+- **2026-08-02:** **Task 9 Completed:** Added `[filehub_register]` shortcode and `POST /wp-json/filehub/v1/register` REST endpoint.
+- **2026-08-02:** **Task 10 Completed:** Added WooCommerce-style dropdown page selectors (`wp_dropdown_pages`), automatic shortcode content injection filter (`the_content`), and redesigned WP Admin panel into a sleek tabbed interface (`.nav-tab-wrapper`).
 
 ## Validation Status
 - All 11 PHP files syntax checked via `php -l` -> 100% Passed cleanly with 0 errors.

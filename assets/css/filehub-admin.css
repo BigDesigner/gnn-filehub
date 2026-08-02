@@ -1,43 +1,51 @@
-/* GNN FileHub NextGen - Modern WP Admin Styles & Pure CSS Toggles */
+/* GNN FileHub NextGen - Modern WP Admin Tabbed Layout & Pure CSS Toggles */
 
 :root {
   --filehub-theme-color: var(--wp-admin-theme-color, #2271b1);
 }
 
+/* Tab Navigation Styling */
+.filehub-nav-tab-wrapper {
+  border-bottom: 1px solid #c3c4c7;
+  margin-bottom: 20px;
+}
+
 .filehub-dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 20px;
-  margin-top: 20px;
+  margin-top: 15px;
 }
 
 .filehub-card {
   background: #fff;
   border: 1px solid #c3c4c7;
-  border-radius: 4px;
-  padding: 16px 20px;
-  box-shadow: 0 1px 1px rgba(0,0,0,.04);
+  border-radius: 6px;
+  padding: 20px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .filehub-card h3 {
   margin-top: 0;
-  margin-bottom: 12px;
+  margin-bottom: 15px;
   color: #1d2327;
   font-size: 1.1em;
+  border-bottom: 1px solid #f0f0f1;
+  padding-bottom: 10px;
 }
 
 .filehub-stat-number {
-  font-size: 2em;
-  font-weight: 600;
+  font-size: 2.2em;
+  font-weight: 700;
   color: var(--filehub-theme-color);
   line-height: 1.2;
 }
 
 .filehub-progress-bar {
   width: 100%;
-  height: 10px;
+  height: 12px;
   background-color: #f0f0f1;
-  border-radius: 5px;
+  border-radius: 6px;
   overflow: hidden;
   margin-top: 10px;
 }
@@ -52,36 +60,76 @@
 .filehub-switch {
   position: relative;
   display: inline-block;
-  width: 44px;
-  height: 24px;
+  width: 46px;
+  height: 26px;
+  vertical-align: middle;
 }
+
 .filehub-switch input {
   opacity: 0;
   width: 0;
   height: 0;
 }
+
 .filehub-slider {
   position: absolute;
   cursor: pointer;
-  top: 0; left: 0; right: 0; bottom: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   background-color: #ccc;
-  transition: .3s;
-  border-radius: 24px;
+  transition: 0.3s;
+  border-radius: 26px;
 }
+
 .filehub-slider:before {
   position: absolute;
   content: "";
-  height: 18px;
-  width: 18px;
+  height: 20px;
+  width: 20px;
   left: 3px;
   bottom: 3px;
   background-color: white;
-  transition: .3s;
+  transition: 0.3s;
   border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
 }
+
 .filehub-switch input:checked + .filehub-slider {
   background-color: var(--filehub-theme-color);
 }
+
 .filehub-switch input:checked + .filehub-slider:before {
   transform: translateX(20px);
+}
+
+/* Driver Selection Radio Cards */
+.filehub-driver-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 15px;
+  margin-top: 10px;
+}
+
+.filehub-driver-card {
+  border: 2px solid #c3c4c7;
+  border-radius: 6px;
+  padding: 15px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: #fafafa;
+}
+
+.filehub-driver-card:hover {
+  border-color: var(--filehub-theme-color);
+}
+
+.filehub-driver-card.selected {
+  border-color: var(--filehub-theme-color);
+  background: #f0f6fc;
+}
+
+.filehub-driver-card input[type="radio"] {
+  margin-right: 8px;
 }
