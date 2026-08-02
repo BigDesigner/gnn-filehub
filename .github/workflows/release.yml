@@ -31,7 +31,7 @@ jobs:
           if [ -n "$VERSION_INPUT" ]; then
             VERSION="$VERSION_INPUT"
           else
-            VERSION=$(cat VERSION | tr -d '\r\n ')
+            VERSION=$(cat gnn-filehub/VERSION | tr -d '\r\n ')
           fi
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "version=$VERSION" >> $GITHUB_OUTPUT
@@ -39,16 +39,14 @@ jobs:
 
       - name: Prepare Clean Plugin Package Directory
         run: |
-          mkdir -p dist/gnn-filehub-nextgen
-          cp -r gnn-filehub-nextgen.php inc assets VERSION dist/gnn-filehub-nextgen/
-          if [ -d "languages" ]; then cp -r languages dist/gnn-filehub-nextgen/; fi
-          if [ -f "README.md" ]; then cp README.md dist/gnn-filehub-nextgen/; fi
+          mkdir -p dist/gnn-filehub
+          cp -r gnn-filehub/* dist/gnn-filehub/
 
       - name: Create Zip Archive
         run: |
           cd dist
-          ZIP_NAME="gnn-filehub-nextgen-v${VERSION}.zip"
-          zip -r "../$ZIP_NAME" gnn-filehub-nextgen
+          ZIP_NAME="gnn-filehub-v${VERSION}.zip"
+          zip -r "../$ZIP_NAME" gnn-filehub
           cd ..
 
       - name: Upload Build Artifact
