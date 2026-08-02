@@ -20,12 +20,12 @@ class FileHub_Shortcodes {
         add_shortcode( 'filehub_password_change', array( $this, 'render_password_change_shortcode' ) );
         add_action( 'wp_enqueue_scripts', array( $this, 'register_public_scripts' ) );
 
-        // WooCommerce-style Automatic Shortcode Injection on Assigned Pages
+        // Automatic Shortcode Injection on Assigned Pages
         add_filter( 'the_content', array( $this, 'auto_inject_shortcodes' ) );
     }
 
     /**
-     * Automatic Shortcode Injection for WooCommerce-style Assigned Pages
+     * Automatic Shortcode Injection for Assigned Pages
      */
     public function auto_inject_shortcodes( $content ) {
         if ( ! is_singular( 'page' ) || ! in_the_loop() || ! is_main_query() ) {

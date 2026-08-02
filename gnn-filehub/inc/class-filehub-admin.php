@@ -81,7 +81,7 @@ class FileHub_Admin {
         register_setting( 'filehub_settings_group', 'filehub_auto_rename' );
         register_setting( 'filehub_settings_group', 'filehub_allowed_extensions' );
 
-        // WooCommerce-style Page Assignments
+        // Automatic Page Assignments
         register_setting( 'filehub_settings_group', 'filehub_page_register' );
         register_setting( 'filehub_settings_group', 'filehub_page_login' );
         register_setting( 'filehub_settings_group', 'filehub_page_profile' );
@@ -263,16 +263,14 @@ class FileHub_Admin {
     }
 
     /**
-     * Tab 3: WooCommerce-style Page Assignments
+     * Tab 3: Automatic Page Assignments
      */
     private function render_tab_pages() {
         ?>
         <form method="post" action="options.php">
-            <?php
-            settings_fields( 'filehub_settings_group' );
-            ?>
+            <?php settings_fields( 'filehub_settings_group' ); ?>
             <div class="filehub-card">
-                <h3><?php esc_html_e( 'WooCommerce Stili Otomatik Sayfa Atamaları', 'gnn-filehub' ); ?></h3>
+                <h3><?php esc_html_e( 'Otomatik Sayfa Atamaları', 'gnn-filehub' ); ?></h3>
                 <p style="color: #646970; margin-bottom: 20px;">
                     <?php esc_html_e( 'Aşağıdaki WordPress sayfalarını seçtiğinizde, kısa kodlar (shortcode) ilgili sayfalara otomatik olarak gömülür. Manuel kısa kod yazmak zorunda kalmazsınız.', 'gnn-filehub' ); ?>
                 </p>
