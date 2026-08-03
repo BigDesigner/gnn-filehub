@@ -145,8 +145,9 @@ class FileHub_Shortcodes {
         );
 
         wp_localize_script( 'filehub-public-js', 'filehub_vars', array(
-            'rest_url' => esc_url_raw( rest_url() ),
-            'nonce'    => wp_create_nonce( 'wp_rest' ),
+            'rest_url'      => esc_url_raw( rest_url() ),
+            'nonce'         => wp_create_nonce( 'wp_rest' ),
+            'active_driver' => get_option( 'filehub_storage_driver', 'local' ),
         ) );
     }
 

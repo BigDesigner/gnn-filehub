@@ -36,6 +36,20 @@ class FileHub_REST_API extends WP_REST_Controller {
             'permission_callback' => array( $this, 'check_upload_permission' ),
         ) );
 
+        // Direct browser → Cloudflare R2 upload: WordPress only ever issues a signed URL and
+        // registers the attachment afterwards, the file bytes never pass through PHP at all.
+        register_rest_route( $this->namespace, '/r2-presign', array(
+            'methods'             => WP_REST_Server::CREATABLE,
+            'callback'            => array( $this, 'handle_r2_presign' ),
+            'permission_callback' => array( $this, 'check_upload_permission' ),
+        ) );
+
+        register_rest_route( $this->namespace, '/r2-finalize', array(
+            'methods'             => WP_REST_Server::CREATABLE,
+            'callback'            => array( $this, 'handle_r2_finalize' ),
+            'permission_callback' => array( $this, 'check_upload_permission' ),
+        ) );
+
         register_rest_route( $this->namespace, '/files', array(
             'methods'             => WP_REST_Server::READABLE,
             'callback'            => array( $this, 'handle_list_files' ),
@@ -232,6 +246,13 @@ class FileHub_REST_API extends WP_REST_Controller {
      * Only ever called from within the upload-chunk lock, so it runs at most once per upload.
      */
     private function merge_uploaded_chunks( $chunk_dir, $total_chunks, $user_id, $file_id, $filename, $ext, $chunk_file ) {
+        // Merging every part and streaming the result to the storage driver (especially a
+        // cloud upload) can comfortably outrun PHP's default 30s max_execution_time on a large
+        // file — this only affects the single request handling the final chunk, not every one.
+        if ( function_exists( 'set_time_limit' ) ) {
+            @set_time_limit( 0 );
+        }
+
         $assembled_tmp = sys_get_temp_dir() . '/assembled_' . $user_id . '_' . $file_id . '.' . $ext;
         $out_stream    = fopen( $assembled_tmp, 'wb' );
 
@@ -301,6 +322,110 @@ class FileHub_REST_API extends WP_REST_Controller {
             'success'       => true,
             'attachment_id' => $attachment_id,
             'file_name'     => $upload_result['file_name'],
+            'download_url'  => rest_url( 'filehub/v1/download/' . $attachment_id ),
+        ), 200 );
+    }
+
+    /**
+     * Issue a Presigned R2 Upload URL for a Direct Browser → Cloudflare Upload
+     * The file itself never reaches this server — the browser PUTs it straight to R2 using the
+     * returned URL. We only check the extension whitelist and the user's remaining quota here,
+     * against the size the client reports (the real, server-verified size is re-checked in
+     * handle_r2_finalize once the object actually exists on R2).
+     */
+    public function handle_r2_presign( $request ) {
+        if ( 'r2' !== get_option( 'filehub_storage_driver', 'local' ) ) {
+            return new WP_REST_Response( array( 'error' => __( 'Aktif depolama sürücüsü Cloudflare R2 değil.', 'gnn-filehub' ) ), 400 );
+        }
+
+        $params    = $request->get_json_params();
+        $filename  = FileHub_Attachment::sanitize_upload_filename( isset( $params['filename'] ) ? (string) $params['filename'] : '' );
+        $file_size = isset( $params['file_size'] ) ? absint( $params['file_size'] ) : 0;
+        $user_id   = get_current_user_id() ?: 0;
+
+        if ( empty( $filename ) ) {
+            return new WP_REST_Response( array( 'error' => __( 'Dosya adı eksik.', 'gnn-filehub' ) ), 400 );
+        }
+
+        $allowed_exts = array_map( 'trim', explode( ',', get_option( 'filehub_allowed_extensions', 'jpg,jpeg,png,gif,pdf,zip,doc,docx,xlsx' ) ) );
+        $ext          = strtolower( pathinfo( $filename, PATHINFO_EXTENSION ) );
+        if ( ! in_array( $ext, $allowed_exts, true ) ) {
+            return new WP_REST_Response( array( 'error' => __( 'Bu dosya uzantısına izin verilmiyor.', 'gnn-filehub' ) ), 400 );
+        }
+
+        $user_stats = FileHub_Attachment::get_user_stats( $user_id );
+        if ( $user_stats['quota_bytes'] > 0 && ( $user_stats['total_bytes'] + $file_size ) > $user_stats['quota_bytes'] ) {
+            return new WP_REST_Response( array( 'error' => __( 'Depolama kotanızı aşıyor.', 'gnn-filehub' ) ), 400 );
+        }
+
+        $driver = new FileHub_Storage_R2();
+        $presign = $driver->get_presigned_upload_url( $filename, $user_id );
+
+        if ( is_wp_error( $presign ) ) {
+            return new WP_REST_Response( array( 'error' => $presign->get_error_message() ), 500 );
+        }
+
+        return new WP_REST_Response( array(
+            'success'    => true,
+            'upload_url' => $presign['upload_url'],
+            'key'        => $presign['key'],
+        ), 200 );
+    }
+
+    /**
+     * Register the Attachment for a File the Browser Already Uploaded Directly to R2
+     * Re-verifies the object actually exists on R2 and reads its real size back via a HEAD
+     * request before trusting anything the client says about it.
+     */
+    public function handle_r2_finalize( $request ) {
+        if ( 'r2' !== get_option( 'filehub_storage_driver', 'local' ) ) {
+            return new WP_REST_Response( array( 'error' => __( 'Aktif depolama sürücüsü Cloudflare R2 değil.', 'gnn-filehub' ) ), 400 );
+        }
+
+        $params    = $request->get_json_params();
+        $key       = isset( $params['key'] ) ? sanitize_text_field( (string) $params['key'] ) : '';
+        $filename  = FileHub_Attachment::sanitize_upload_filename( isset( $params['filename'] ) ? (string) $params['filename'] : '' );
+        $mime_type = isset( $params['mime_type'] ) ? sanitize_text_field( (string) $params['mime_type'] ) : 'application/octet-stream';
+        $user_id   = get_current_user_id() ?: 0;
+
+        if ( empty( $key ) || empty( $filename ) ) {
+            return new WP_REST_Response( array( 'error' => __( 'Eksik yükleme bilgisi.', 'gnn-filehub' ) ), 400 );
+        }
+
+        // Ownership sanity check: our own presign always scopes the key under uploads/{user_id}/.
+        if ( 0 !== strpos( $key, 'uploads/' . $user_id . '/' ) ) {
+            return new WP_REST_Response( array( 'error' => __( 'Bu dosya size ait değil.', 'gnn-filehub' ) ), 403 );
+        }
+
+        $driver = new FileHub_Storage_R2();
+        $meta   = $driver->verify_uploaded_object( $key );
+
+        if ( is_wp_error( $meta ) ) {
+            return new WP_REST_Response( array( 'error' => $meta->get_error_message() ), 500 );
+        }
+
+        $user_stats = FileHub_Attachment::get_user_stats( $user_id );
+        if ( $user_stats['quota_bytes'] > 0 && ( $user_stats['total_bytes'] + $meta['file_size'] ) > $user_stats['quota_bytes'] ) {
+            $driver->delete_file( $key );
+            return new WP_REST_Response( array( 'error' => __( 'Depolama kotanızı aştınız, dosya kaldırıldı.', 'gnn-filehub' ) ), 400 );
+        }
+
+        $upload_result = array(
+            'storage_driver' => 'r2',
+            'storage_key'    => $key,
+            'file_name'      => $filename,
+            'file_size'      => $meta['file_size'],
+        );
+
+        $attachment_id = FileHub_Attachment::create_attachment( $upload_result, $user_id, $mime_type ?: $meta['content_type'] );
+        if ( is_wp_error( $attachment_id ) ) {
+            return new WP_REST_Response( array( 'error' => $attachment_id->get_error_message() ), 500 );
+        }
+
+        return new WP_REST_Response( array(
+            'success'       => true,
+            'attachment_id' => $attachment_id,
+            'file_name'     => $filename,
             'download_url'  => rest_url( 'filehub/v1/download/' . $attachment_id ),
         ), 200 );
     }

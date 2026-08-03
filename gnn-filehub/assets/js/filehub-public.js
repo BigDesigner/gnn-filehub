@@ -194,19 +194,44 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Uploads every selected/dropped file one after another (sequential, not parallel),
     // so the server and the progress bar only ever deal with one upload at a time.
+    // Each upload path reports back whether it actually succeeded via onSettled(success) —
+    // the final summary reflects real outcomes instead of always claiming success regardless
+    // of what happened.
     function uploadFileQueue(fileList) {
       const files = Array.from(fileList);
       let index = 0;
+      let failCount = 0;
 
       if (progressBar) progressBar.style.display = 'block';
 
+      function finish() {
+        const successCount = files.length - failCount;
+
+        if (statusText) {
+          if (files.length === 1) {
+            // Leave whatever specific message the single upload path already set (its own
+            // success line, or the real error) instead of overwriting it with a generic one.
+            if (failCount === 0) {
+              statusText.textContent = 'Yükleme başarıyla tamamlandı!';
+            }
+          } else if (failCount === 0) {
+            statusText.textContent = `${files.length} dosya başarıyla yüklendi!`;
+          } else if (successCount === 0) {
+            statusText.textContent = `${files.length} dosyanın hiçbiri yüklenemedi.`;
+          } else {
+            statusText.textContent = `${successCount}/${files.length} dosya yüklendi, ${failCount} dosya başarısız oldu.`;
+          }
+        }
+
+        setTimeout(() => {
+          if (progressBar) progressBar.style.display = 'none';
+          refreshAllFileLists();
+        }, 1200);
+      }
+
       function uploadNext() {
         if (index >= files.length) {
-          if (statusText) statusText.textContent = `${files.length} dosya başarıyla yüklendi!`;
-          setTimeout(() => {
-            if (progressBar) progressBar.style.display = 'none';
-            refreshAllFileLists();
-          }, 1200);
+          finish();
           return;
         }
 
@@ -214,11 +239,19 @@ document.addEventListener('DOMContentLoaded', function () {
         const position = ++index; // 1-based for display
         const label = files.length > 1 ? `(${position}/${files.length}) ${file.name}: ` : '';
 
-        const onSettled = function () {
+        const onSettled = function ( success ) {
+          if ( false === success ) {
+            failCount++;
+          }
           uploadNext();
         };
 
-        if (file.size > CHUNK_SIZE) {
+        if (window.filehub_vars && filehub_vars.active_driver === 'r2') {
+          // Cloudflare R2 is configured: skip our own server entirely and upload straight from
+          // the browser to R2 with a presigned URL — no PHP memory/time limits apply, any file
+          // size behaves the same way (this is how WeTransfer-style uploads actually work).
+          uploadFileR2Direct(file, label, onSettled);
+        } else if (file.size > CHUNK_SIZE) {
           uploadFileChunked(file, label, onSettled);
         } else {
           uploadFileSingle(file, label, onSettled);
@@ -226,6 +259,85 @@ document.addEventListener('DOMContentLoaded', function () {
       }
 
       uploadNext();
+    }
+
+    function uploadFileR2Direct(file, label, onSettled) {
+      if (statusText) statusText.textContent = label + 'Yükleme başlatılıyor...';
+
+      fetch(filehub_vars.rest_url + 'filehub/v1/r2-presign', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-WP-Nonce': filehub_vars.nonce
+        },
+        body: JSON.stringify({ filename: file.name, file_size: file.size })
+      })
+        .then(res => res.json())
+        .then(presignData => {
+          if (!presignData.success) {
+            if (statusText) statusText.textContent = label + 'Hata: ' + (presignData.error || 'Yükleme başlatılamadı.');
+            onSettled(false);
+            return;
+          }
+
+          const xhr = new XMLHttpRequest();
+          const startTime = new Date().getTime();
+
+          xhr.upload.addEventListener('progress', function (e) {
+            if (e.lengthComputable) {
+              const percent = Math.round((e.loaded / e.total) * 100);
+              const elapsedTime = (new Date().getTime() - startTime) / 1000;
+              const speedBytes = elapsedTime > 0 ? e.loaded / elapsedTime : 0;
+              const speedMB = (speedBytes / (1024 * 1024)).toFixed(2);
+
+              if (progressFill) progressFill.style.width = percent + '%';
+              if (statusText) statusText.textContent = `${label}Yükleniyor: %${percent} (${speedMB} MB/s)`;
+            }
+          });
+
+          xhr.onreadystatechange = function () {
+            if (xhr.readyState === XMLHttpRequest.DONE) {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                if (statusText) statusText.textContent = label + 'Kaydediliyor...';
+
+                fetch(filehub_vars.rest_url + 'filehub/v1/r2-finalize', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'X-WP-Nonce': filehub_vars.nonce
+                  },
+                  body: JSON.stringify({ key: presignData.key, filename: file.name, mime_type: file.type })
+                })
+                  .then(res => res.json())
+                  .then(finalizeData => {
+                    if (finalizeData.success) {
+                      if (statusText) statusText.textContent = label + 'Yükleme başarıyla tamamlandı!';
+                      if (progressFill) progressFill.style.width = '100%';
+                      onSettled(true);
+                    } else {
+                      if (statusText) statusText.textContent = label + 'Hata: ' + (finalizeData.error || 'Kayıt başarısız.');
+                      onSettled(false);
+                    }
+                  })
+                  .catch(() => {
+                    if (statusText) statusText.textContent = label + 'Sunucu bağlantı hatası.';
+                    onSettled(false);
+                  });
+              } else {
+                if (statusText) statusText.textContent = label + 'Hata: Cloudflare R2\'ye yükleme başarısız. Bucket CORS ayarlarını kontrol edin.';
+                onSettled(false);
+              }
+            }
+          };
+
+          xhr.open('PUT', presignData.upload_url, true);
+          xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+          xhr.send(file);
+        })
+        .catch(() => {
+          if (statusText) statusText.textContent = label + 'Sunucu bağlantı hatası.';
+          onSettled(false);
+        });
     }
 
     function uploadFileSingle(file, label, onSettled) {
@@ -254,6 +366,7 @@ document.addEventListener('DOMContentLoaded', function () {
           if (xhr.status === 200) {
             if (statusText) statusText.textContent = label + 'Yükleme başarıyla tamamlandı!';
             if (progressFill) progressFill.style.width = '100%';
+            onSettled(true);
           } else {
             try {
               const resp = JSON.parse(xhr.responseText);
@@ -261,8 +374,8 @@ document.addEventListener('DOMContentLoaded', function () {
             } catch (err) {
               if (statusText) statusText.textContent = label + 'Sunucu yükleme hatası.';
             }
+            onSettled(false);
           }
-          onSettled();
         }
       };
 
@@ -367,11 +480,12 @@ document.addEventListener('DOMContentLoaded', function () {
       Promise.all(workers).then(function () {
         if (failed) {
           if (statusText) statusText.textContent = label + 'Hata: ' + failMessage;
+          onSettled(false);
         } else {
           if (statusText) statusText.textContent = label + 'Tüm parçalar birleştirildi, yükleme başarılı!';
           if (progressFill) progressFill.style.width = '100%';
+          onSettled(true);
         }
-        onSettled();
       });
     }
   }

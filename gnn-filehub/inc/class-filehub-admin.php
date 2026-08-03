@@ -104,8 +104,9 @@ class FileHub_Admin {
             );
 
             wp_localize_script( 'filehub-public-js', 'filehub_vars', array(
-                'rest_url' => esc_url_raw( rest_url() ),
-                'nonce'    => wp_create_nonce( 'wp_rest' ),
+                'rest_url'      => esc_url_raw( rest_url() ),
+                'nonce'         => wp_create_nonce( 'wp_rest' ),
+                'active_driver' => get_option( 'filehub_storage_driver', 'local' ),
             ) );
         }
     }
@@ -582,6 +583,12 @@ class FileHub_Admin {
 
             <div class="filehub-card filehub-storage-panel" data-driver="r2" style="margin-top: 20px; <?php echo $driver !== 'r2' ? 'display:none;' : ''; ?>">
                 <h3>Cloudflare R2 API Bilgileri</h3>
+                <p class="description" style="margin-bottom: 15px;">
+                    <?php esc_html_e( 'Dosyalar tarayıcıdan doğrudan R2\'ye yüklenir (sunucunuzdan geçmez). Bunun çalışması için R2 bucket\'ınızın CORS ayarlarına sitenizin adresini eklemeniz gerekir:', 'gnn-filehub' ); ?>
+                    <br>
+                    <code style="user-select: all;">AllowedOrigins: <?php echo esc_html( home_url() ); ?></code>,
+                    <code style="user-select: all;">AllowedMethods: PUT, GET, HEAD</code>
+                </p>
                 <table class="form-table">
                     <tr>
                         <th scope="row">Account ID</th>
