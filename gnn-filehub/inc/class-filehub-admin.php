@@ -122,6 +122,8 @@ class FileHub_Admin {
         register_setting( 'filehub_general_group', 'filehub_allowed_extensions' );
         register_setting( 'filehub_general_group', 'filehub_default_quota_mb' );
         register_setting( 'filehub_general_group', 'filehub_max_upload_mb' );
+        register_setting( 'filehub_general_group', 'filehub_upload_notify' );
+        register_setting( 'filehub_general_group', 'filehub_notify_email' );
 
         // Automatic Page Assignments
         register_setting( 'filehub_pages_group', 'filehub_page_account' );
@@ -298,9 +300,11 @@ class FileHub_Admin {
      * Settings Tab: General & Security
      */
     private function render_tab_general() {
-        $guest_upload = get_option( 'filehub_guest_upload', '0' );
-        $strict_mime  = get_option( 'filehub_strict_mime', '1' );
-        $auto_rename  = get_option( 'filehub_auto_rename', '1' );
+        $guest_upload   = get_option( 'filehub_guest_upload', '0' );
+        $strict_mime    = get_option( 'filehub_strict_mime', '1' );
+        $auto_rename    = get_option( 'filehub_auto_rename', '1' );
+        $upload_notify  = get_option( 'filehub_upload_notify', '1' );
+        $notify_email   = get_option( 'filehub_notify_email', get_option( 'admin_email' ) );
         ?>
         <form method="post" action="options.php">
             <?php
@@ -358,6 +362,23 @@ class FileHub_Admin {
                         <td>
                             <input type="number" name="filehub_max_upload_mb" value="<?php echo esc_attr( get_option( 'filehub_max_upload_mb', 0 ) ); ?>" min="0" step="1" class="regular-text">
                             <p class="description"><?php esc_html_e( 'Tek bir dosya için izin verilen maksimum boyut. 0 = sınırsız.', 'gnn-filehub' ); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e( 'Yükleme Bildirim E-postası', 'gnn-filehub' ); ?></th>
+                        <td>
+                            <label class="filehub-switch">
+                                <input type="checkbox" name="filehub_upload_notify" value="1" <?php checked( '1', $upload_notify ); ?>>
+                                <span class="filehub-slider"></span>
+                            </label>
+                            <p class="description"><?php esc_html_e( 'Açık olduğunda, her başarılı dosya yüklemesinde aşağıdaki adrese bilgilendirme e-postası gönderilir.', 'gnn-filehub' ); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e( 'Bildirim E-posta Adresi', 'gnn-filehub' ); ?></th>
+                        <td>
+                            <input type="email" name="filehub_notify_email" class="regular-text" value="<?php echo esc_attr( $notify_email ); ?>">
+                            <p class="description"><?php esc_html_e( 'Boş bırakılırsa sitenin yönetici e-posta adresi (Ayarlar → Genel) kullanılır.', 'gnn-filehub' ); ?></p>
                         </td>
                     </tr>
                 </table>
@@ -882,6 +903,8 @@ class FileHub_Admin {
             'filehub_allowed_extensions'   => 'text',
             'filehub_default_quota_mb'     => 'number',
             'filehub_max_upload_mb'        => 'number',
+            'filehub_upload_notify'        => 'checkbox',
+            'filehub_notify_email'         => 'text',
             'filehub_page_account'         => 'page_id',
             'filehub_page_uploader'        => 'page_id',
             'filehub_page_manager'         => 'page_id',
