@@ -645,22 +645,30 @@ class FileHub_REST_API extends WP_REST_Controller {
     }
 
     /**
-     * Handle Profile Update via REST (Display Name, Optionally Password)
-     * Display name is always applied if changed; the password fields are only validated and
-     * applied if the user actually filled in a new password — leaving them blank lets someone
-     * update just their display name without re-entering their current password.
+     * Handle Profile Update via REST (Display Name and/or Password)
+     * The account page submits these as two entirely independent forms — the display-name form
+     * never sends password keys, the password form never sends `display_name` — so each is only
+     * applied when its own key is actually present in the request body. This keeps updating one
+     * from ever touching, or even validating, the other.
      */
     public function handle_update_profile( $request ) {
-        $params            = $request->get_json_params();
-        $display_name      = isset( $params['display_name'] ) ? sanitize_text_field( (string) $params['display_name'] ) : '';
-        $current_password  = isset( $params['current_password'] ) ? $params['current_password'] : '';
+        $params           = $request->get_json_params();
+        $has_display_name = array_key_exists( 'display_name', $params );
+        $display_name     = $has_display_name ? sanitize_text_field( (string) $params['display_name'] ) : '';
+        $wants_password_change = array_key_exists( 'new_password', $params )
+            || array_key_exists( 'confirm_password', $params )
+            || array_key_exists( 'current_password', $params );
+        $current_password = isset( $params['current_password'] ) ? $params['current_password'] : '';
         $new_password      = isset( $params['new_password'] ) ? $params['new_password'] : '';
         $confirm_password  = isset( $params['confirm_password'] ) ? $params['confirm_password'] : '';
-        $wants_password_change = '' !== $new_password || '' !== $confirm_password || '' !== $current_password;
+
+        if ( ! $has_display_name && ! $wants_password_change ) {
+            return new WP_REST_Response( array( 'error' => __( 'Güncellenecek bir bilgi gönderilmedi.', 'gnn-filehub' ) ), 400 );
+        }
 
         $user = wp_get_current_user();
 
-        if ( '' === $display_name ) {
+        if ( $has_display_name && '' === $display_name ) {
             return new WP_REST_Response( array( 'error' => __( 'Görünen ad boş bırakılamaz.', 'gnn-filehub' ) ), 400 );
         }
 
@@ -682,7 +690,9 @@ class FileHub_REST_API extends WP_REST_Controller {
             }
         }
 
-        wp_update_user( array( 'ID' => $user->ID, 'display_name' => $display_name ) );
+        if ( $has_display_name ) {
+            wp_update_user( array( 'ID' => $user->ID, 'display_name' => $display_name ) );
+        }
 
         if ( $wants_password_change ) {
             wp_set_password( $new_password, $user->ID );
@@ -690,13 +700,18 @@ class FileHub_REST_API extends WP_REST_Controller {
             wp_set_auth_cookie( $user->ID );
         }
 
-        return new WP_REST_Response( array(
-            'success'      => true,
-            'message'      => $wants_password_change
-                ? __( 'Bilgileriniz ve şifreniz başarıyla güncellendi.', 'gnn-filehub' )
+        $response = array(
+            'success' => true,
+            'message' => $wants_password_change
+                ? __( 'Şifreniz başarıyla güncellendi.', 'gnn-filehub' )
                 : __( 'Bilgileriniz başarıyla güncellendi.', 'gnn-filehub' ),
-            'display_name' => $display_name,
-        ), 200 );
+        );
+
+        if ( $has_display_name ) {
+            $response['display_name'] = $display_name;
+        }
+
+        return new WP_REST_Response( $response, 200 );
     }
 
     /**

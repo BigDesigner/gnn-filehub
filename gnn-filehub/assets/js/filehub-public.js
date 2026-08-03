@@ -119,6 +119,8 @@ document.addEventListener('DOMContentLoaded', function () {
   const progressBar = document.getElementById('filehub-progress-bar');
   const progressFill = document.getElementById('filehub-progress-fill');
   const statusText = document.getElementById('filehub-status-text');
+  const displayNameForm = document.getElementById('filehub-displayname-form');
+  const displayNameStatus = document.getElementById('filehub-displayname-status');
   const passwordForm = document.getElementById('filehub-password-form');
   const passwordStatus = document.getElementById('filehub-password-status');
   const registerForm = document.getElementById('filehub-register-form');
@@ -633,11 +635,53 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   });
 
-  // Front-End Profile Update Handler (Display Name + Optional Password Change)
+  // Front-End Display Name Update Handler — entirely independent of the password form below,
+  // sends only display_name so the server never even looks at password fields for this request.
+  if (displayNameForm) {
+    displayNameForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      const display_name = document.getElementById('filehub_display_name').value;
+
+      if (displayNameStatus) displayNameStatus.textContent = 'Güncelleniyor...';
+
+      fetch(filehub_vars.rest_url + 'filehub/v1/update-profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-WP-Nonce': filehub_vars.nonce
+        },
+        body: JSON.stringify({ display_name: display_name })
+      })
+        .then(res => res.json())
+        .then(resp => {
+          if (resp.success) {
+            if (displayNameStatus) {
+              displayNameStatus.style.color = '#00a32a';
+              displayNameStatus.textContent = resp.message;
+            }
+            const displayNameHeading = document.getElementById('filehub-profile-display-name');
+            if (displayNameHeading && resp.display_name) {
+              displayNameHeading.textContent = resp.display_name;
+            }
+          } else if (displayNameStatus) {
+            displayNameStatus.style.color = '#b32d2e';
+            displayNameStatus.textContent = resp.error || 'Güncelleme başarısız.';
+          }
+        })
+        .catch(function () {
+          if (displayNameStatus) {
+            displayNameStatus.style.color = '#b32d2e';
+            displayNameStatus.textContent = 'Sunucu bağlantı hatası.';
+          }
+        });
+    });
+  }
+
+  // Front-End Password Change Handler — entirely independent of the display name form above,
+  // never sends display_name so the server never touches it for this request.
   if (passwordForm) {
     passwordForm.addEventListener('submit', function (e) {
       e.preventDefault();
-      const display_name = document.getElementById('filehub_display_name').value;
       const current_password = document.getElementById('filehub_current_password').value;
       const new_password = document.getElementById('filehub_new_password').value;
       const confirm_password = document.getElementById('filehub_confirm_password').value;
@@ -651,7 +695,6 @@ document.addEventListener('DOMContentLoaded', function () {
           'X-WP-Nonce': filehub_vars.nonce
         },
         body: JSON.stringify({
-          display_name: display_name,
           current_password: current_password,
           new_password: new_password,
           confirm_password: confirm_password
@@ -664,24 +707,13 @@ document.addEventListener('DOMContentLoaded', function () {
               passwordStatus.style.color = '#00a32a';
               passwordStatus.textContent = resp.message;
             }
-            // Only clear the password fields — the display name field should keep showing
-            // what was just saved, not snap back to the page-load value like form.reset() would.
-            document.getElementById('filehub_current_password').value = '';
-            document.getElementById('filehub_new_password').value = '';
-            document.getElementById('filehub_confirm_password').value = '';
-
-            const displayNameHeading = document.getElementById('filehub-profile-display-name');
-            if (displayNameHeading && resp.display_name) {
-              displayNameHeading.textContent = resp.display_name;
-            }
-          } else {
-            if (passwordStatus) {
-              passwordStatus.style.color = '#b32d2e';
-              passwordStatus.textContent = resp.error || 'Güncelleme başarısız.';
-            }
+            passwordForm.reset();
+          } else if (passwordStatus) {
+            passwordStatus.style.color = '#b32d2e';
+            passwordStatus.textContent = resp.error || 'Güncelleme başarısız.';
           }
         })
-        .catch(err => {
+        .catch(function () {
           if (passwordStatus) {
             passwordStatus.style.color = '#b32d2e';
             passwordStatus.textContent = 'Sunucu bağlantı hatası.';

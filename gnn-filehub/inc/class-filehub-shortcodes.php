@@ -624,7 +624,7 @@ class FileHub_Shortcodes {
                 <hr style="border: 0; border-top: 1px solid var(--filehub-border-soft); margin: 20px 0 15px;">
 
                 <details class="filehub-collapsible">
-                    <summary><?php esc_html_e( 'Bilgileri Güncelle', 'gnn-filehub' ); ?></summary>
+                    <summary><?php esc_html_e( 'Hesap Bilgileri', 'gnn-filehub' ); ?></summary>
                     <div class="filehub-collapsible-content">
                         <?php echo $this->render_password_change_form_markup(); ?>
                     </div>
@@ -649,7 +649,7 @@ class FileHub_Shortcodes {
         ?>
         <div class="filehub-container">
             <div class="filehub-card filehub-auth-card">
-                <h3><?php esc_html_e( 'Bilgileri Güncelle', 'gnn-filehub' ); ?></h3>
+                <h3><?php esc_html_e( 'Hesap Bilgileri', 'gnn-filehub' ); ?></h3>
                 <?php echo $this->render_password_change_form_markup(); ?>
             </div>
         </div>
@@ -659,9 +659,9 @@ class FileHub_Shortcodes {
 
     /**
      * Shared Profile Update Form Markup (used by profile shortcode & standalone shortcode)
-     * Display name is always required; the password fields are optional — left blank, only the
-     * display name is updated, so a user doesn't have to re-enter their password just to change
-     * how their name shows up.
+     * Two independent forms sharing the same REST endpoint (/update-profile): submitting the
+     * display name form never touches password fields (and vice versa), each with its own
+     * button and status line, so updating one never looks like it's also touching the other.
      */
     private function render_password_change_form_markup() {
         wp_enqueue_style( 'filehub-public-css' );
@@ -672,26 +672,31 @@ class FileHub_Shortcodes {
         ob_start();
         ?>
         <div class="filehub-auth-form-inner">
-            <form id="filehub-password-form">
+            <form id="filehub-displayname-form">
                 <div class="filehub-field">
                     <label for="filehub_display_name"><?php esc_html_e( 'Görünen Ad', 'gnn-filehub' ); ?></label>
                     <input type="text" id="filehub_display_name" value="<?php echo esc_attr( $user->display_name ); ?>" required>
                 </div>
-                <hr style="border: 0; border-top: 1px solid var(--filehub-border-soft); margin: 16px 0;">
-                <p class="description" style="margin: 0 0 10px;"><?php esc_html_e( 'Şifrenizi değiştirmek istemiyorsanız aşağıdaki alanları boş bırakabilirsiniz.', 'gnn-filehub' ); ?></p>
+                <button type="submit" class="button button-primary" style="width: 100%; padding: 6px;"><?php esc_html_e( 'Bilgileri Güncelle', 'gnn-filehub' ); ?></button>
+            </form>
+            <p id="filehub-displayname-status" style="margin-top: 12px; font-weight: 600;"></p>
+
+            <hr style="border: 0; border-top: 1px solid var(--filehub-border-soft); margin: 20px 0;">
+
+            <form id="filehub-password-form">
                 <div class="filehub-field">
                     <label for="filehub_current_password"><?php esc_html_e( 'Mevcut Şifre', 'gnn-filehub' ); ?></label>
-                    <input type="password" id="filehub_current_password">
+                    <input type="password" id="filehub_current_password" required>
                 </div>
                 <div class="filehub-field">
                     <label for="filehub_new_password"><?php esc_html_e( 'Yeni Şifre', 'gnn-filehub' ); ?></label>
-                    <input type="password" id="filehub_new_password" minlength="6">
+                    <input type="password" id="filehub_new_password" required minlength="6">
                 </div>
                 <div class="filehub-field">
                     <label for="filehub_confirm_password"><?php esc_html_e( 'Yeni Şifre (Tekrar)', 'gnn-filehub' ); ?></label>
-                    <input type="password" id="filehub_confirm_password" minlength="6">
+                    <input type="password" id="filehub_confirm_password" required minlength="6">
                 </div>
-                <button type="submit" class="button button-primary" style="width: 100%; padding: 6px;"><?php esc_html_e( 'Bilgileri Güncelle', 'gnn-filehub' ); ?></button>
+                <button type="submit" class="button button-primary" style="width: 100%; padding: 6px;"><?php esc_html_e( 'Şifre Güncelle', 'gnn-filehub' ); ?></button>
             </form>
             <p id="filehub-password-status" style="margin-top: 12px; font-weight: 600;"></p>
         </div>
