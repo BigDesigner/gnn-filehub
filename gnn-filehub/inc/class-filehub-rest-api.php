@@ -68,9 +68,9 @@ class FileHub_REST_API extends WP_REST_Controller {
             'permission_callback' => '__return_true', // Download URL checked inside handler
         ) );
 
-        register_rest_route( $this->namespace, '/change-password', array(
+        register_rest_route( $this->namespace, '/update-profile', array(
             'methods'             => WP_REST_Server::CREATABLE,
-            'callback'            => array( $this, 'handle_change_password' ),
+            'callback'            => array( $this, 'handle_update_profile' ),
             'permission_callback' => array( $this, 'check_user_permission' ),
         ) );
 
@@ -529,6 +529,7 @@ class FileHub_REST_API extends WP_REST_Controller {
                 'file_size'      => size_format( $size ),
                 'driver'         => FileHub_Attachment::ascii_upper( $driver ),
                 'download_count' => $downloads,
+                'author_id'      => (int) $post->post_author,
                 'author_name'    => $author ? $author->display_name : 'Guest',
                 'created_at'     => get_the_date( 'Y-m-d H:i', $att_id ),
                 'download_url'   => $this->build_download_url( $att_id ),
@@ -644,36 +645,58 @@ class FileHub_REST_API extends WP_REST_Controller {
     }
 
     /**
-     * Handle Change Password via REST
+     * Handle Profile Update via REST (Display Name, Optionally Password)
+     * Display name is always applied if changed; the password fields are only validated and
+     * applied if the user actually filled in a new password — leaving them blank lets someone
+     * update just their display name without re-entering their current password.
      */
-    public function handle_change_password( $request ) {
-        $params           = $request->get_json_params();
-        $current_password = isset( $params['current_password'] ) ? $params['current_password'] : '';
-        $new_password     = isset( $params['new_password'] ) ? $params['new_password'] : '';
-        $confirm_password = isset( $params['confirm_password'] ) ? $params['confirm_password'] : '';
-
-        if ( empty( $current_password ) || empty( $new_password ) || empty( $confirm_password ) ) {
-            return new WP_REST_Response( array( 'error' => __( 'Lütfen tüm şifre alanlarını doldurun.', 'gnn-filehub' ) ), 400 );
-        }
-
-        if ( $new_password !== $confirm_password ) {
-            return new WP_REST_Response( array( 'error' => __( 'Yeni şifreler birbiriyle eşleşmiyor.', 'gnn-filehub' ) ), 400 );
-        }
-
-        if ( strlen( $new_password ) < 6 ) {
-            return new WP_REST_Response( array( 'error' => __( 'Şifre en az 6 karakter olmalıdır.', 'gnn-filehub' ) ), 400 );
-        }
+    public function handle_update_profile( $request ) {
+        $params            = $request->get_json_params();
+        $display_name      = isset( $params['display_name'] ) ? sanitize_text_field( (string) $params['display_name'] ) : '';
+        $current_password  = isset( $params['current_password'] ) ? $params['current_password'] : '';
+        $new_password      = isset( $params['new_password'] ) ? $params['new_password'] : '';
+        $confirm_password  = isset( $params['confirm_password'] ) ? $params['confirm_password'] : '';
+        $wants_password_change = '' !== $new_password || '' !== $confirm_password || '' !== $current_password;
 
         $user = wp_get_current_user();
-        if ( ! wp_check_password( $current_password, $user->user_pass, $user->ID ) ) {
-            return new WP_REST_Response( array( 'error' => __( 'Mevcut şifreniz yanlış.', 'gnn-filehub' ) ), 400 );
+
+        if ( '' === $display_name ) {
+            return new WP_REST_Response( array( 'error' => __( 'Görünen ad boş bırakılamaz.', 'gnn-filehub' ) ), 400 );
         }
 
-        wp_set_password( $new_password, $user->ID );
-        wp_set_current_user( $user->ID );
-        wp_set_auth_cookie( $user->ID );
+        if ( $wants_password_change ) {
+            if ( empty( $current_password ) || empty( $new_password ) || empty( $confirm_password ) ) {
+                return new WP_REST_Response( array( 'error' => __( 'Şifrenizi değiştirmek için tüm şifre alanlarını doldurun.', 'gnn-filehub' ) ), 400 );
+            }
 
-        return new WP_REST_Response( array( 'success' => true, 'message' => __( 'Şifreniz başarıyla güncellendi.', 'gnn-filehub' ) ), 200 );
+            if ( $new_password !== $confirm_password ) {
+                return new WP_REST_Response( array( 'error' => __( 'Yeni şifreler birbiriyle eşleşmiyor.', 'gnn-filehub' ) ), 400 );
+            }
+
+            if ( strlen( $new_password ) < 6 ) {
+                return new WP_REST_Response( array( 'error' => __( 'Şifre en az 6 karakter olmalıdır.', 'gnn-filehub' ) ), 400 );
+            }
+
+            if ( ! wp_check_password( $current_password, $user->user_pass, $user->ID ) ) {
+                return new WP_REST_Response( array( 'error' => __( 'Mevcut şifreniz yanlış.', 'gnn-filehub' ) ), 400 );
+            }
+        }
+
+        wp_update_user( array( 'ID' => $user->ID, 'display_name' => $display_name ) );
+
+        if ( $wants_password_change ) {
+            wp_set_password( $new_password, $user->ID );
+            wp_set_current_user( $user->ID );
+            wp_set_auth_cookie( $user->ID );
+        }
+
+        return new WP_REST_Response( array(
+            'success'      => true,
+            'message'      => $wants_password_change
+                ? __( 'Bilgileriniz ve şifreniz başarıyla güncellendi.', 'gnn-filehub' )
+                : __( 'Bilgileriniz başarıyla güncellendi.', 'gnn-filehub' ),
+            'display_name' => $display_name,
+        ), 200 );
     }
 
     /**

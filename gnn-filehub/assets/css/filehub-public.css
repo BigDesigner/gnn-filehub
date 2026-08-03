@@ -445,6 +445,15 @@
   margin-bottom: 20px;
 }
 
+.filehub-profile-header-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.filehub-profile-header-actions {
+  flex: 0 0 auto;
+}
+
 .filehub-profile-stats {
   display: flex;
   flex-wrap: wrap;

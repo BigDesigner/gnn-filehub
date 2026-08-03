@@ -546,16 +546,23 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function renderFileList(container, items) {
     if (!container) return;
-    let html = '<div class="filehub-table-wrap"><table class="filehub-table"><thead><tr><th>Dosya Adı</th><th>Boyut</th><th>Sürücü</th><th>Yükleyen</th><th>İndirme</th><th>İşlem</th></tr></thead><tbody>';
+    // The "Kullanıcı ID" column only makes sense on the cross-user "all files" scope (Tüm
+    // Dosyalar) — on a user's own file list it would just repeat their own ID on every row.
+    const showAuthorId = container.getAttribute('data-scope') === 'all';
+    const colCount = showAuthorId ? 7 : 6;
+    const authorIdHeader = showAuthorId ? '<th>Kullanıcı ID</th>' : '';
+    let html = '<div class="filehub-table-wrap"><table class="filehub-table"><thead><tr><th>Dosya Adı</th><th>Boyut</th><th>Sürücü</th>' + authorIdHeader + '<th>Kullanıcı</th><th>İndirme</th><th>İşlem</th></tr></thead><tbody>';
     if (items.length === 0) {
-      html += '<tr><td colspan="6" style="text-align:center; padding: 20px;">Dosya bulunamadı.</td></tr>';
+      html += '<tr><td colspan="' + colCount + '" style="text-align:center; padding: 20px;">Dosya bulunamadı.</td></tr>';
     } else {
       items.forEach(item => {
         const deleteBtn = item.can_delete ? `<button type="button" class="filehub-action-btn filehub-btn-delete filehub-delete-btn" data-id="${item.id}" data-label="Sil">Sil</button>` : '';
+        const authorIdCell = showAuthorId ? `<td>${item.author_id}</td>` : '';
         html += `<tr>
           <td><strong>${escapeHtml(item.file_name || item.title)}</strong></td>
           <td>${item.file_size}</td>
           <td><span class="filehub-driver-badge">${item.driver}</span></td>
+          ${authorIdCell}
           <td>${escapeHtml(item.author_name)}</td>
           <td>${item.download_count}</td>
           <td>
@@ -626,23 +633,25 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   });
 
-  // Front-End Password Change Handler
+  // Front-End Profile Update Handler (Display Name + Optional Password Change)
   if (passwordForm) {
     passwordForm.addEventListener('submit', function (e) {
       e.preventDefault();
+      const display_name = document.getElementById('filehub_display_name').value;
       const current_password = document.getElementById('filehub_current_password').value;
       const new_password = document.getElementById('filehub_new_password').value;
       const confirm_password = document.getElementById('filehub_confirm_password').value;
 
-      if (passwordStatus) passwordStatus.textContent = 'Şifre güncelleniyor...';
+      if (passwordStatus) passwordStatus.textContent = 'Güncelleniyor...';
 
-      fetch(filehub_vars.rest_url + 'filehub/v1/change-password', {
+      fetch(filehub_vars.rest_url + 'filehub/v1/update-profile', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-WP-Nonce': filehub_vars.nonce
         },
         body: JSON.stringify({
+          display_name: display_name,
           current_password: current_password,
           new_password: new_password,
           confirm_password: confirm_password
@@ -655,7 +664,16 @@ document.addEventListener('DOMContentLoaded', function () {
               passwordStatus.style.color = '#00a32a';
               passwordStatus.textContent = resp.message;
             }
-            passwordForm.reset();
+            // Only clear the password fields — the display name field should keep showing
+            // what was just saved, not snap back to the page-load value like form.reset() would.
+            document.getElementById('filehub_current_password').value = '';
+            document.getElementById('filehub_new_password').value = '';
+            document.getElementById('filehub_confirm_password').value = '';
+
+            const displayNameHeading = document.getElementById('filehub-profile-display-name');
+            if (displayNameHeading && resp.display_name) {
+              displayNameHeading.textContent = resp.display_name;
+            }
           } else {
             if (passwordStatus) {
               passwordStatus.style.color = '#b32d2e';
