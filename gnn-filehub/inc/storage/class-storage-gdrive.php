@@ -4,6 +4,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 require_once GNN_FILEHUB_PATH . 'inc/storage/class-storage-interface.php';
+require_once GNN_FILEHUB_PATH . 'inc/class-filehub-attachment.php';
 
 /**
  * Class FileHub_Storage_GDrive
@@ -70,7 +71,7 @@ class FileHub_Storage_GDrive implements FileHub_Storage_Interface {
             return $access_token;
         }
 
-        $filename      = sanitize_file_name( $file['name'] );
+        $filename      = FileHub_Attachment::sanitize_upload_filename( $file['name'] );
         $metadata      = array(
             'name' => $filename,
         );

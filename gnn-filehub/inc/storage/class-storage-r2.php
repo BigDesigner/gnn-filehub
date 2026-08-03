@@ -4,6 +4,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 require_once GNN_FILEHUB_PATH . 'inc/storage/class-storage-interface.php';
+require_once GNN_FILEHUB_PATH . 'inc/class-filehub-attachment.php';
 
 /**
  * Class FileHub_Storage_R2
@@ -91,7 +92,7 @@ class FileHub_Storage_R2 implements FileHub_Storage_Interface {
             return new WP_Error( 'filehub_r2_config_missing', __( 'Cloudflare R2 API bilgileri eksik.', 'gnn-filehub' ) );
         }
 
-        $filename      = sanitize_file_name( $file['name'] );
+        $filename      = FileHub_Attachment::sanitize_upload_filename( $file['name'] );
         $r2_key        = 'uploads/' . $user_id . '/' . time() . '-' . $filename;
         $uri           = '/' . $this->bucket . '/' . $r2_key;
         $file_contents = file_get_contents( $file['tmp_name'] );

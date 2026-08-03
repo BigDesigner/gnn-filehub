@@ -408,7 +408,7 @@ document.addEventListener('DOMContentLoaded', function () {
       items.forEach(item => {
         const deleteBtn = item.can_delete ? `<button type="button" class="button button-link-delete button-small filehub-delete-btn" data-id="${item.id}" style="color:#b32d2e; margin-left:8px;">Sil</button>` : '';
         html += `<tr>
-          <td><strong>${escapeHtml(item.title)}</strong></td>
+          <td><strong>${escapeHtml(item.file_name || item.title)}</strong></td>
           <td>${item.file_size}</td>
           <td><span class="filehub-driver-badge">${item.driver}</span></td>
           <td>${escapeHtml(item.author_name)}</td>
@@ -461,7 +461,7 @@ document.addEventListener('DOMContentLoaded', function () {
       const term = this.value.toLowerCase().trim();
       const cached = fileListCache.get(container) || [];
       const filtered = cached.filter(item =>
-        item.title.toLowerCase().includes(term) || item.author_name.toLowerCase().includes(term)
+        (item.file_name || item.title).toLowerCase().includes(term) || item.author_name.toLowerCase().includes(term)
       );
       renderFileList(container, filtered);
     });

@@ -149,7 +149,7 @@ class FileHub_REST_API extends WP_REST_Controller {
         $file_id      = preg_replace( '/[^a-zA-Z0-9_-]/', '', (string) $request->get_param( 'file_id' ) );
         $chunk_index  = absint( $request->get_param( 'chunk_index' ) );
         $total_chunks = absint( $request->get_param( 'total_chunks' ) );
-        $filename     = sanitize_file_name( (string) $request->get_param( 'filename' ) );
+        $filename     = FileHub_Attachment::sanitize_upload_filename( (string) $request->get_param( 'filename' ) );
 
         if ( empty( $file_id ) || empty( $filename ) || $total_chunks <= 0 ) {
             return new WP_REST_Response( array( 'error' => __( 'Görünüşe göre geçersiz parça bilgileri gönderildi.', 'gnn-filehub' ) ), 400 );
@@ -342,7 +342,7 @@ class FileHub_REST_API extends WP_REST_Controller {
             $data[] = array(
                 'id'             => $att_id,
                 'title'          => get_the_title( $att_id ),
-                'file_name'      => basename( get_attached_file( $att_id ) ?: get_the_title( $att_id ) ),
+                'file_name'      => get_post_meta( $att_id, '_filehub_file_name', true ) ?: basename( get_attached_file( $att_id ) ?: get_the_title( $att_id ) ),
                 'file_size'      => size_format( $size ),
                 'driver'         => strtoupper( $driver ),
                 'download_count' => $downloads,
@@ -427,7 +427,8 @@ class FileHub_REST_API extends WP_REST_Controller {
                 break;
         }
 
-        $driver->get_download_stream( $storage_key, $post->post_mime_type, get_the_title( $post->ID ) );
+        $download_name = get_post_meta( $attachment_id, '_filehub_file_name', true ) ?: get_the_title( $post->ID );
+        $driver->get_download_stream( $storage_key, $post->post_mime_type, $download_name );
     }
 
     /**

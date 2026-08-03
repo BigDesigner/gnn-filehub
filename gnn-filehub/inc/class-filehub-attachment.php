@@ -10,6 +10,31 @@ if ( ! defined( 'ABSPATH' ) ) {
 class FileHub_Attachment {
 
     /**
+     * Sanitize an Uploaded File Name for Safe, Predictable Storage
+     * Transliterates Turkish characters to their ASCII equivalents, replaces whitespace with
+     * underscores, then runs the result through WordPress's own sanitize_file_name() for
+     * everything else (stripping special characters, etc.).
+     *
+     * @param string $filename Original, user-supplied file name.
+     * @return string
+     */
+    public static function sanitize_upload_filename( string $filename ): string {
+        $turkish_map = array(
+            'ç' => 'c', 'Ç' => 'C',
+            'ğ' => 'g', 'Ğ' => 'G',
+            'ı' => 'i', 'İ' => 'I',
+            'ö' => 'o', 'Ö' => 'O',
+            'ş' => 's', 'Ş' => 'S',
+            'ü' => 'u', 'Ü' => 'U',
+        );
+
+        $filename = strtr( $filename, $turkish_map );
+        $filename = preg_replace( '/\s+/', '_', trim( $filename ) );
+
+        return sanitize_file_name( $filename );
+    }
+
+    /**
      * Register Uploaded File in WordPress Attachment CPT
      *
      * @param array  $storage_result Result array from storage engine driver.
@@ -39,6 +64,9 @@ class FileHub_Attachment {
         update_post_meta( $attachment_id, '_filehub_user_id', $user_id );
         update_post_meta( $attachment_id, '_filehub_file_size', $storage_result['file_size'] );
         update_post_meta( $attachment_id, '_filehub_download_count', 0 );
+        // post_title strips the extension (PATHINFO_FILENAME above), so the real filename
+        // with its extension is kept separately for downloads/listing.
+        update_post_meta( $attachment_id, '_filehub_file_name', $file_name );
 
         return $attachment_id;
     }

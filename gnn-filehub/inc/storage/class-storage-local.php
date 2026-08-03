@@ -4,6 +4,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 require_once GNN_FILEHUB_PATH . 'inc/storage/class-storage-interface.php';
+require_once GNN_FILEHUB_PATH . 'inc/class-filehub-attachment.php';
 
 /**
  * Class FileHub_Storage_Local
@@ -51,18 +52,18 @@ class FileHub_Storage_Local implements FileHub_Storage_Interface {
             wp_mkdir_p( $user_dir );
         }
 
-        $filename      = sanitize_file_name( $file['name'] );
+        $filename      = FileHub_Attachment::sanitize_upload_filename( $file['name'] );
         $file_info     = pathinfo( $filename );
         $name_part     = $file_info['filename'];
         $extension     = isset( $file_info['extension'] ) ? '.' . strtolower( $file_info['extension'] ) : '';
-        
+
         $counter       = 1;
         $unique_name   = $filename;
         $target_path   = $user_dir . '/' . $unique_name;
 
         // Collision avoidance
         while ( file_exists( $target_path ) ) {
-            $unique_name = $name_part . '-' . $counter . $extension;
+            $unique_name = $name_part . '_' . $counter . $extension;
             $target_path = $user_dir . '/' . $unique_name;
             $counter++;
         }
