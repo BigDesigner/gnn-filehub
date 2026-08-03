@@ -592,6 +592,14 @@ class FileHub_REST_API extends WP_REST_Controller {
             wp_die( esc_html__( 'Dosya bulunamadı.', 'gnn-filehub' ) );
         }
 
+        // BOLA Ownership Check — the route's permission_callback is intentionally __return_true
+        // since download needs to work as a plain browser-navigable link, not a REST call with
+        // headers, so the actual authorization has to happen here instead.
+        if ( (int) $post->post_author !== get_current_user_id() && ! current_user_can( 'manage_options' ) ) {
+            status_header( 403 );
+            wp_die( esc_html__( 'Bu dosyayı indirme yetkiniz yok.', 'gnn-filehub' ) );
+        }
+
         $driver_name = get_post_meta( $attachment_id, '_filehub_storage_driver', true ) ?: 'local';
         $storage_key = get_post_meta( $attachment_id, '_filehub_storage_key', true );
 
