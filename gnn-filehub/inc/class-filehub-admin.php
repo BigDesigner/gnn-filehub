@@ -250,7 +250,7 @@ class FileHub_Admin {
             </div>
             <div class="filehub-card">
                 <h3><?php esc_html_e( 'Aktif Depolama Sürücüsü', 'gnn-filehub' ); ?></h3>
-                <div class="filehub-stat-number" style="text-transform:uppercase;"><?php echo esc_html( get_option( 'filehub_storage_driver', 'local' ) ); ?></div>
+                <div class="filehub-stat-number"><?php echo esc_html( FileHub_Attachment::ascii_upper( get_option( 'filehub_storage_driver', 'local' ) ) ); ?></div>
             </div>
         </div>
 

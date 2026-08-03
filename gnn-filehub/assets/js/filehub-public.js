@@ -173,6 +173,13 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     dropZone.addEventListener('drop', handleDrop, false);
+
+    // The whole dropzone is clickable — no separate "Dosya Seç" button needed (and having a
+    // <button> nested inside meant its own styling never actually applied on the front end).
+    dropZone.addEventListener('click', function () {
+      fileInput.click();
+    });
+
     fileInput.addEventListener('change', function () {
       if (this.files.length > 0) {
         uploadFileQueue(this.files);

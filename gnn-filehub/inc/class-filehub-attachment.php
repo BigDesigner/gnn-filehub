@@ -35,6 +35,21 @@ class FileHub_Attachment {
     }
 
     /**
+     * Locale-Independent ASCII Uppercase
+     * PHP's strtoupper() (and, in the browser, CSS text-transform: uppercase applied to an
+     * element under a Turkish lang/locale) respect Turkish casing rules, where lowercase "i"
+     * uppercases to the dotted "İ" — correct for real Turkish words, but wrong for brand/driver
+     * names like "gdrive" or "r2" that must always render as plain ASCII ("GDRIVE"), not
+     * "GDRİVE". Used anywhere a fixed, non-localized identifier needs uppercasing.
+     *
+     * @param string $str
+     * @return string
+     */
+    public static function ascii_upper( string $str ): string {
+        return strtr( $str, 'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' );
+    }
+
+    /**
      * Register Uploaded File in WordPress Attachment CPT
      *
      * @param array  $storage_result Result array from storage engine driver.

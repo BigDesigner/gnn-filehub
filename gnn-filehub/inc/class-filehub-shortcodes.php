@@ -235,9 +235,6 @@ class FileHub_Shortcodes {
                     <p class="filehub-dropzone-title"><?php esc_html_e( 'Dosyaları buraya sürükleyin', 'gnn-filehub' ); ?></p>
                     <p class="filehub-dropzone-subtitle"><?php esc_html_e( 'veya bilgisayarınızdan seçmek için tıklayın', 'gnn-filehub' ); ?></p>
                     <input type="file" id="filehub-file-input" multiple style="display: none;">
-                    <form onsubmit="return false;">
-                        <button type="button" class="button button-primary" onclick="document.getElementById('filehub-file-input').click();"><?php esc_html_e( 'Dosya Seç', 'gnn-filehub' ); ?></button>
-                    </form>
                 </div>
 
                 <div id="filehub-progress-bar" class="filehub-progress-bar" style="display: none; margin-top: 15px;">
@@ -549,16 +546,23 @@ class FileHub_Shortcodes {
 
         wp_enqueue_style( 'filehub-public-css' );
 
-        $user  = wp_get_current_user();
-        $stats = FileHub_Attachment::get_user_stats( $user->ID );
+        $user     = wp_get_current_user();
+        $stats    = FileHub_Attachment::get_user_stats( $user->ID );
+        $is_admin = current_user_can( 'manage_options' );
 
         ob_start();
         ?>
         <div class="filehub-container">
             <?php
+            // Admins get a "Tüm Dosyalar" card (all members' files) instead of "Dosyalarım" —
+            // their own personal files view is meaningless from an admin/operator perspective.
+            $files_card = $is_admin
+                ? array( 'option' => 'filehub_page_admin_files', 'title' => __( 'Tüm Dosyalar', 'gnn-filehub' ), 'desc' => __( 'Tüm üyelerin dosyalarını görüntüleyin ve yönetin', 'gnn-filehub' ), 'icon' => 'files' )
+                : array( 'option' => 'filehub_page_manager', 'title' => __( 'Dosyalarım', 'gnn-filehub' ), 'desc' => __( 'Yüklediğiniz dosyaları görüntüleyin ve yönetin', 'gnn-filehub' ), 'icon' => 'files' );
+
             echo $this->render_nav_cards( array(
                 array( 'option' => 'filehub_page_uploader', 'title' => __( 'Dosya Gönder', 'gnn-filehub' ), 'desc' => __( 'Yeni bir dosya yükleyin', 'gnn-filehub' ), 'icon' => 'upload' ),
-                array( 'option' => 'filehub_page_manager', 'title' => __( 'Dosyalarım', 'gnn-filehub' ), 'desc' => __( 'Yüklediğiniz dosyaları görüntüleyin ve yönetin', 'gnn-filehub' ), 'icon' => 'files' ),
+                $files_card,
             ) );
             ?>
             <div class="filehub-card filehub-profile-card">
@@ -567,6 +571,16 @@ class FileHub_Shortcodes {
                     <div>
                         <h2 style="margin: 0; font-size: 1.4em;"><?php echo esc_html( $user->display_name ); ?></h2>
                         <p style="margin: 4px 0 0 0; color: var(--filehub-text-muted);"><?php echo esc_html( $user->user_email ); ?></p>
+                        <p style="margin: 4px 0 0 0; color: var(--filehub-text-muted); font-size: 0.9em;">
+                            <?php
+                            printf(
+                                /* translators: 1: username (user_login), 2: numeric user ID */
+                                esc_html__( 'Kullanıcı Adı: %1$s · Kullanıcı ID: %2$s', 'gnn-filehub' ),
+                                esc_html( $user->user_login ),
+                                '<code>' . esc_html( $user->ID ) . '</code>'
+                            );
+                            ?>
+                        </p>
                     </div>
                 </div>
 
@@ -592,6 +606,10 @@ class FileHub_Shortcodes {
                     <div>
                         <span class="filehub-profile-stat-label"><?php esc_html_e( 'Kullanıcı Rolü', 'gnn-filehub' ); ?></span>
                         <div class="filehub-profile-stat-value" style="text-transform: capitalize;"><?php echo esc_html( implode( ', ', $user->roles ) ); ?></div>
+                    </div>
+                    <div>
+                        <span class="filehub-profile-stat-label"><?php esc_html_e( 'Kullanıcı ID', 'gnn-filehub' ); ?></span>
+                        <div class="filehub-profile-stat-value"><?php echo esc_html( $user->ID ); ?></div>
                     </div>
                 </div>
 

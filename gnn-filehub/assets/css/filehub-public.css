@@ -43,8 +43,13 @@
 }
 
 .filehub-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 150px;
   border: 2px dashed var(--filehub-border);
-  padding: 56px 24px;
+  padding: 16px 24px;
   text-align: center;
   background: var(--filehub-bg-soft);
   border-radius: 10px;
@@ -62,23 +67,23 @@
 }
 
 .filehub-dropzone-icon {
-  width: 52px;
-  height: 52px;
-  margin: 0 auto 16px;
+  width: 36px;
+  height: 36px;
+  margin: 0 auto 10px;
   color: var(--filehub-theme-color);
 }
 
 .filehub-dropzone-title {
-  font-size: 1.15em;
+  font-size: 1.1em;
   font-weight: 600;
   color: var(--filehub-text);
-  margin: 0 0 6px;
+  margin: 0 0 4px;
 }
 
 .filehub-dropzone-subtitle {
   color: var(--filehub-text-muted);
-  margin: 0 0 20px;
-  font-size: 0.95em;
+  margin: 0;
+  font-size: 0.9em;
 }
 
 /* -------------------------------------------------- */
@@ -442,6 +447,7 @@
 
 .filehub-profile-stats {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 12px;
   margin-top: 20px;
@@ -449,6 +455,10 @@
   padding: 14px;
   border-radius: 8px;
   border: 1px solid var(--filehub-border-soft);
+}
+
+.filehub-profile-stats > div {
+  flex: 1 1 auto;
 }
 
 .filehub-profile-stat-label {
@@ -468,6 +478,6 @@
   }
 
   .filehub-dropzone {
-    padding: 36px 16px;
+    padding: 16px;
   }
 }

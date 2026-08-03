@@ -159,7 +159,7 @@ class FileHub_REST_API extends WP_REST_Controller {
             'success'       => true,
             'attachment_id' => $attachment_id,
             'file_name'     => $upload_result['file_name'],
-            'download_url'  => rest_url( 'filehub/v1/download/' . $attachment_id ),
+            'download_url'  => $this->build_download_url( $attachment_id ),
         ), 200 );
     }
 
@@ -358,7 +358,7 @@ class FileHub_REST_API extends WP_REST_Controller {
             'success'       => true,
             'attachment_id' => $attachment_id,
             'file_name'     => $upload_result['file_name'],
-            'download_url'  => rest_url( 'filehub/v1/download/' . $attachment_id ),
+            'download_url'  => $this->build_download_url( $attachment_id ),
         ), 200 );
     }
 
@@ -484,7 +484,7 @@ class FileHub_REST_API extends WP_REST_Controller {
             'success'       => true,
             'attachment_id' => $attachment_id,
             'file_name'     => $filename,
-            'download_url'  => rest_url( 'filehub/v1/download/' . $attachment_id ),
+            'download_url'  => $this->build_download_url( $attachment_id ),
         ), 200 );
     }
 
@@ -527,11 +527,11 @@ class FileHub_REST_API extends WP_REST_Controller {
                 'title'          => get_the_title( $att_id ),
                 'file_name'      => get_post_meta( $att_id, '_filehub_file_name', true ) ?: basename( get_attached_file( $att_id ) ?: get_the_title( $att_id ) ),
                 'file_size'      => size_format( $size ),
-                'driver'         => strtoupper( $driver ),
+                'driver'         => FileHub_Attachment::ascii_upper( $driver ),
                 'download_count' => $downloads,
                 'author_name'    => $author ? $author->display_name : 'Guest',
                 'created_at'     => get_the_date( 'Y-m-d H:i', $att_id ),
-                'download_url'   => rest_url( 'filehub/v1/download/' . $att_id ),
+                'download_url'   => $this->build_download_url( $att_id ),
                 'can_delete'     => $can_delete,
             );
         }
@@ -578,6 +578,27 @@ class FileHub_REST_API extends WP_REST_Controller {
         wp_delete_attachment( $attachment_id, true );
 
         return new WP_REST_Response( array( 'success' => true, 'message' => __( 'Dosya başarıyla silindi.', 'gnn-filehub' ) ), 200 );
+    }
+
+    /**
+     * Build a Download URL that Actually Carries Authentication
+     * The download link is a plain, browser-navigable <a href> (it has to be — it can't send a
+     * custom X-WP-Nonce header like a fetch() call can). Without a nonce, WordPress's REST
+     * cookie-auth layer (rest_cookie_check_errors()) doesn't resolve the request to the real
+     * logged-in user even though the session cookie is valid, so get_current_user_id() inside
+     * handle_download_file() would see 0 and the ownership check would reject the file's own
+     * owner. Appending the same "wp_rest" nonce already used for X-WP-Nonce as a `_wpnonce`
+     * query arg satisfies that same check via $_REQUEST instead.
+     *
+     * @param int $attachment_id
+     * @return string
+     */
+    private function build_download_url( int $attachment_id ): string {
+        return add_query_arg(
+            '_wpnonce',
+            wp_create_nonce( 'wp_rest' ),
+            rest_url( 'filehub/v1/download/' . $attachment_id )
+        );
     }
 
     /**
