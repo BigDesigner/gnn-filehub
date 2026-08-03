@@ -3,7 +3,7 @@
  * Plugin Name:       GNN Filehub
  * Plugin URI:        https://gnn.com.tr
  * Description:       100% WordPress Core Native, zero-dependency file upload and multi-cloud storage management plugin.
- * Version:           1.3.0
+ * Version:           1.4.0
  * Author URI: 			https://github.com/BigDesigner
  * License: 			GPLv2 or later
  * License URI: 		https://www.gnu.org/licenses/gpl-2.0.html
