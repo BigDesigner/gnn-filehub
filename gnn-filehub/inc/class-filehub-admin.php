@@ -18,6 +18,8 @@ class FileHub_Admin {
         add_action( 'admin_init', array( $this, 'maybe_create_missing_pages' ) );
         add_action( 'admin_init', array( $this, 'handle_export_settings' ) );
         add_action( 'admin_init', array( $this, 'handle_import_settings' ) );
+        add_action( 'admin_init', array( $this, 'handle_gdrive_oauth_start' ) );
+        add_action( 'admin_init', array( $this, 'handle_gdrive_oauth_callback' ) );
 
         add_action( 'show_user_profile', array( $this, 'render_user_profile_fields' ) );
         add_action( 'edit_user_profile', array( $this, 'render_user_profile_fields' ) );
@@ -132,8 +134,11 @@ class FileHub_Admin {
         register_setting( 'filehub_storage_group', 'filehub_r2_bucket' );
         register_setting( 'filehub_storage_group', 'filehub_gdrive_client_id' );
         register_setting( 'filehub_storage_group', 'filehub_gdrive_client_secret' );
-        register_setting( 'filehub_storage_group', 'filehub_gdrive_refresh_token' );
         register_setting( 'filehub_storage_group', 'filehub_gdrive_folder_id' );
+        // filehub_gdrive_refresh_token is intentionally NOT registered here: it's no longer a
+        // form field, it's written directly via update_option() by the OAuth "Connect" flow
+        // (handle_gdrive_oauth_callback). Registering it to this group would make options.php
+        // blank it out on every save of this form, since it's never present in the POST data.
     }
 
     /**
@@ -599,6 +604,13 @@ class FileHub_Admin {
 
             <div class="filehub-card filehub-storage-panel" data-driver="gdrive" style="margin-top: 20px; <?php echo $driver !== 'gdrive' ? 'display:none;' : ''; ?>">
                 <h3>Google Drive API v3 Bilgileri</h3>
+
+                <p class="description" style="margin-bottom: 15px;">
+                    <?php esc_html_e( 'Google Cloud Console\'daki OAuth istemcinizin "Authorized redirect URIs" listesine şu adresi ekleyin:', 'gnn-filehub' ); ?>
+                    <br>
+                    <code style="user-select: all;"><?php echo esc_html( $this->get_gdrive_oauth_redirect_uri() ); ?></code>
+                </p>
+
                 <table class="form-table">
                     <tr>
                         <th scope="row">Client ID</th>
@@ -609,18 +621,73 @@ class FileHub_Admin {
                         <td><input type="password" name="filehub_gdrive_client_secret" class="regular-text" value="<?php echo esc_attr( get_option( 'filehub_gdrive_client_secret' ) ); ?>"></td>
                     </tr>
                     <tr>
-                        <th scope="row">Refresh Token</th>
-                        <td><input type="text" name="filehub_gdrive_refresh_token" class="regular-text" value="<?php echo esc_attr( get_option( 'filehub_gdrive_refresh_token' ) ); ?>"></td>
-                    </tr>
-                    <tr>
                         <th scope="row">Target Folder ID</th>
                         <td><input type="text" name="filehub_gdrive_folder_id" class="regular-text" value="<?php echo esc_attr( get_option( 'filehub_gdrive_folder_id' ) ); ?>"></td>
                     </tr>
                 </table>
+
+                <?php submit_button( __( 'Client ID / Secret / Klasör ID Kaydet', 'gnn-filehub' ), 'secondary', '', false ); ?>
             </div>
 
             <?php submit_button( __( 'Depolama Ayarlarını Kaydet', 'gnn-filehub' ) ); ?>
         </form>
+
+        <?php
+        $gdrive_refresh_token = get_option( 'filehub_gdrive_refresh_token', '' );
+        $gdrive_client_id     = get_option( 'filehub_gdrive_client_id', '' );
+        $gdrive_client_secret = get_option( 'filehub_gdrive_client_secret', '' );
+        $gdrive_notice        = isset( $_GET['filehub_gdrive_oauth'] ) ? sanitize_text_field( $_GET['filehub_gdrive_oauth'] ) : '';
+        ?>
+        <div class="filehub-card filehub-storage-panel" data-driver="gdrive" style="margin-top: 20px; <?php echo $driver !== 'gdrive' ? 'display:none;' : ''; ?>">
+            <h3><?php esc_html_e( 'Google Bağlantısı', 'gnn-filehub' ); ?></h3>
+
+            <?php if ( $gdrive_notice ) : ?>
+                <div class="notice notice-<?php echo 'connected' === $gdrive_notice ? 'success' : 'error'; ?> is-dismissible" style="margin: 0 0 15px;">
+                    <p>
+                        <?php
+                        switch ( $gdrive_notice ) {
+                            case 'connected':
+                                esc_html_e( 'Google Drive hesabınız başarıyla bağlandı.', 'gnn-filehub' );
+                                break;
+                            case 'denied':
+                                esc_html_e( 'İzin verilmedi, bağlantı iptal edildi.', 'gnn-filehub' );
+                                break;
+                            case 'missing_client':
+                                esc_html_e( 'Önce Client ID ve Client Secret alanlarını doldurup kaydedin.', 'gnn-filehub' );
+                                break;
+                            case 'network_error':
+                                esc_html_e( 'Google\'a bağlanılamadı, lütfen tekrar deneyin.', 'gnn-filehub' );
+                                break;
+                            case 'failed':
+                                $reason = isset( $_GET['filehub_gdrive_oauth_reason'] ) ? sanitize_text_field( wp_unslash( $_GET['filehub_gdrive_oauth_reason'] ) ) : '';
+                                printf(
+                                    /* translators: %s: raw error reason returned by Google */
+                                    esc_html__( 'Bağlantı başarısız: %s', 'gnn-filehub' ),
+                                    esc_html( $reason )
+                                );
+                                break;
+                        }
+                        ?>
+                    </p>
+                </div>
+            <?php endif; ?>
+
+            <p>
+                <?php if ( $gdrive_refresh_token ) : ?>
+                    <span style="color: #00a32a; font-weight: 600;">✓ <?php esc_html_e( 'Google Drive hesabınız bağlı.', 'gnn-filehub' ); ?></span>
+                <?php else : ?>
+                    <span style="color: #646970;"><?php esc_html_e( 'Henüz bağlı değil.', 'gnn-filehub' ); ?></span>
+                <?php endif; ?>
+            </p>
+
+            <?php if ( $gdrive_client_id && $gdrive_client_secret ) : ?>
+                <a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin.php?page=filehub-settings&tab=storage&filehub_gdrive_connect=1' ), 'filehub_gdrive_connect' ) ); ?>" class="button button-primary">
+                    <?php echo $gdrive_refresh_token ? esc_html__( 'Yeniden Bağlan', 'gnn-filehub' ) : esc_html__( 'Google ile Bağlan', 'gnn-filehub' ); ?>
+                </a>
+            <?php else : ?>
+                <p class="description"><?php esc_html_e( 'Bağlanmadan önce yukarıdan Client ID ve Client Secret\'ı kaydedin.', 'gnn-filehub' ); ?></p>
+            <?php endif; ?>
+        </div>
         <script>
         (function() {
             var radios = document.querySelectorAll('input[name="filehub_storage_driver"]');
@@ -639,6 +706,124 @@ class FileHub_Admin {
         })();
         </script>
         <?php
+    }
+
+    /**
+     * Google Drive OAuth2 Redirect URI
+     * Must be registered verbatim (no extra query params) in the Google Cloud Console OAuth
+     * client's "Authorized redirect URIs" list — Google matches it exactly against this value.
+     */
+    private function get_gdrive_oauth_redirect_uri(): string {
+        return admin_url( 'admin.php?page=filehub-settings&tab=storage' );
+    }
+
+    /**
+     * Start the Google Drive "Connect" OAuth2 Flow
+     * Redirects the admin to Google's consent screen; the callback (handle_gdrive_oauth_callback)
+     * exchanges the returned authorization code for a refresh token automatically.
+     */
+    public function handle_gdrive_oauth_start() {
+        if ( ! isset( $_GET['filehub_gdrive_connect'] ) || '1' !== $_GET['filehub_gdrive_connect'] ) {
+            return;
+        }
+
+        if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'filehub_gdrive_connect' ) ) {
+            wp_die( esc_html__( 'Güvenlik doğrulaması başarısız.', 'gnn-filehub' ) );
+        }
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( esc_html__( 'Bu işlem için yetkiniz yok.', 'gnn-filehub' ) );
+        }
+
+        $client_id = get_option( 'filehub_gdrive_client_id', '' );
+        if ( empty( $client_id ) ) {
+            wp_safe_redirect( add_query_arg( array( 'page' => 'filehub-settings', 'tab' => 'storage', 'filehub_gdrive_oauth' => 'missing_client' ), admin_url( 'admin.php' ) ) );
+            exit;
+        }
+
+        $params = array(
+            'client_id'     => $client_id,
+            'redirect_uri'  => $this->get_gdrive_oauth_redirect_uri(),
+            'response_type' => 'code',
+            'scope'         => 'https://www.googleapis.com/auth/drive',
+            'access_type'   => 'offline',
+            // Forces Google to re-issue a refresh_token even if this app was already
+            // authorized before — without it, a repeat authorization returns none.
+            'prompt'        => 'consent',
+            'state'         => wp_create_nonce( 'filehub_gdrive_oauth_state' ),
+        );
+
+        wp_redirect( 'https://accounts.google.com/o/oauth2/v2/auth?' . http_build_query( $params ) );
+        exit;
+    }
+
+    /**
+     * Handle the Google OAuth2 Redirect Back & Exchange the Code for a Refresh Token
+     */
+    public function handle_gdrive_oauth_callback() {
+        if ( ! isset( $_GET['page'] ) || 'filehub-settings' !== $_GET['page'] || ! isset( $_GET['tab'] ) || 'storage' !== $_GET['tab'] ) {
+            return;
+        }
+
+        if ( isset( $_GET['error'] ) ) {
+            wp_safe_redirect( add_query_arg( array( 'page' => 'filehub-settings', 'tab' => 'storage', 'filehub_gdrive_oauth' => 'denied' ), admin_url( 'admin.php' ) ) );
+            exit;
+        }
+
+        if ( ! isset( $_GET['code'] ) || ! isset( $_GET['state'] ) ) {
+            return;
+        }
+
+        if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['state'] ) ), 'filehub_gdrive_oauth_state' ) ) {
+            wp_die( esc_html__( 'Güvenlik doğrulaması başarısız (state).', 'gnn-filehub' ) );
+        }
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( esc_html__( 'Bu işlem için yetkiniz yok.', 'gnn-filehub' ) );
+        }
+
+        $client_id     = get_option( 'filehub_gdrive_client_id', '' );
+        $client_secret = get_option( 'filehub_gdrive_client_secret', '' );
+
+        $response = wp_remote_post( 'https://oauth2.googleapis.com/token', array(
+            'body' => array(
+                'code'          => sanitize_text_field( wp_unslash( $_GET['code'] ) ),
+                'client_id'     => $client_id,
+                'client_secret' => $client_secret,
+                'redirect_uri'  => $this->get_gdrive_oauth_redirect_uri(),
+                'grant_type'    => 'authorization_code',
+            ),
+            'timeout' => 30,
+        ) );
+
+        if ( is_wp_error( $response ) ) {
+            wp_safe_redirect( add_query_arg( array( 'page' => 'filehub-settings', 'tab' => 'storage', 'filehub_gdrive_oauth' => 'network_error' ), admin_url( 'admin.php' ) ) );
+            exit;
+        }
+
+        $data = json_decode( wp_remote_retrieve_body( $response ), true );
+
+        if ( empty( $data['refresh_token'] ) ) {
+            $reason = ! empty( $data['error_description'] ) ? $data['error_description'] : ( ! empty( $data['error'] ) ? $data['error'] : 'unknown' );
+            wp_safe_redirect(
+                add_query_arg(
+                    array(
+                        'page'                        => 'filehub-settings',
+                        'tab'                         => 'storage',
+                        'filehub_gdrive_oauth'        => 'failed',
+                        'filehub_gdrive_oauth_reason' => rawurlencode( $reason ),
+                    ),
+                    admin_url( 'admin.php' )
+                )
+            );
+            exit;
+        }
+
+        update_option( 'filehub_gdrive_refresh_token', $data['refresh_token'] );
+        delete_transient( 'filehub_gdrive_access_token' );
+
+        wp_safe_redirect( add_query_arg( array( 'page' => 'filehub-settings', 'tab' => 'storage', 'filehub_gdrive_oauth' => 'connected' ), admin_url( 'admin.php' ) ) );
+        exit;
     }
 
     /**
