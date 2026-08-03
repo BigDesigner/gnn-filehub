@@ -55,7 +55,15 @@ class FileHub_Storage_GDrive implements FileHub_Storage_Interface {
 
         $data = json_decode( wp_remote_retrieve_body( $response ), true );
         if ( empty( $data['access_token'] ) ) {
-            return new WP_Error( 'filehub_gdrive_auth_failed', __( 'Google Drive jetonu alınamadı.', 'gnn-filehub' ) );
+            $reason = ! empty( $data['error_description'] ) ? $data['error_description'] : ( ! empty( $data['error'] ) ? $data['error'] : wp_remote_retrieve_response_code( $response ) );
+            return new WP_Error(
+                'filehub_gdrive_auth_failed',
+                sprintf(
+                    /* translators: %s: raw error reason returned by Google */
+                    __( 'Google Drive jetonu alınamadı: %s', 'gnn-filehub' ),
+                    $reason
+                )
+            );
         }
 
         set_transient( $transient_key, $data['access_token'], $data['expires_in'] - 60 );
@@ -106,7 +114,15 @@ class FileHub_Storage_GDrive implements FileHub_Storage_Interface {
 
         $result = json_decode( wp_remote_retrieve_body( $response ), true );
         if ( empty( $result['id'] ) ) {
-            return new WP_Error( 'filehub_gdrive_upload_failed', __( 'Google Drive yükleme başarısız.', 'gnn-filehub' ) );
+            $reason = ! empty( $result['error']['message'] ) ? $result['error']['message'] : wp_remote_retrieve_response_code( $response );
+            return new WP_Error(
+                'filehub_gdrive_upload_failed',
+                sprintf(
+                    /* translators: %s: raw error reason returned by Google */
+                    __( 'Google Drive yükleme başarısız: %s', 'gnn-filehub' ),
+                    $reason
+                )
+            );
         }
 
         return array(
