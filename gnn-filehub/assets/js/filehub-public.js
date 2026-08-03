@@ -286,12 +286,18 @@ document.addEventListener('DOMContentLoaded', function () {
           xhr.upload.addEventListener('progress', function (e) {
             if (e.lengthComputable) {
               const percent = Math.round((e.loaded / e.total) * 100);
-              const elapsedTime = (new Date().getTime() - startTime) / 1000;
-              const speedBytes = elapsedTime > 0 ? e.loaded / elapsedTime : 0;
-              const speedMB = (speedBytes / (1024 * 1024)).toFixed(2);
-
               if (progressFill) progressFill.style.width = percent + '%';
-              if (statusText) statusText.textContent = `${label}Yükleniyor: %${percent} (${speedMB} MB/s)`;
+
+              if (percent >= 100) {
+                // All bytes are with R2 now, but we still have to tell WordPress about it —
+                // don't leave the user staring at a frozen "%100" with no explanation.
+                if (statusText) statusText.textContent = label + 'Dosya işleniyor, lütfen bekleyin...';
+              } else {
+                const elapsedTime = (new Date().getTime() - startTime) / 1000;
+                const speedBytes = elapsedTime > 0 ? e.loaded / elapsedTime : 0;
+                const speedMB = (speedBytes / (1024 * 1024)).toFixed(2);
+                if (statusText) statusText.textContent = `${label}Yükleniyor: %${percent} (${speedMB} MB/s)`;
+              }
             }
           });
 
@@ -352,12 +358,18 @@ document.addEventListener('DOMContentLoaded', function () {
       xhr.upload.addEventListener('progress', function (e) {
         if (e.lengthComputable) {
           const percent = Math.round((e.loaded / e.total) * 100);
-          const elapsedTime = (new Date().getTime() - startTime) / 1000;
-          const speedBytes = elapsedTime > 0 ? e.loaded / elapsedTime : 0;
-          const speedMB = (speedBytes / (1024 * 1024)).toFixed(2);
-
           if (progressFill) progressFill.style.width = percent + '%';
-          if (statusText) statusText.textContent = `${label}Yükleniyor: %${percent} (${speedMB} MB/s)`;
+
+          if (percent >= 100) {
+            // The bytes are all uploaded, but the server still has to save/relay the file —
+            // don't leave the user staring at a frozen "%100" with no explanation.
+            if (statusText) statusText.textContent = label + 'Dosya işleniyor, lütfen bekleyin...';
+          } else {
+            const elapsedTime = (new Date().getTime() - startTime) / 1000;
+            const speedBytes = elapsedTime > 0 ? e.loaded / elapsedTime : 0;
+            const speedMB = (speedBytes / (1024 * 1024)).toFixed(2);
+            if (statusText) statusText.textContent = `${label}Yükleniyor: %${percent} (${speedMB} MB/s)`;
+          }
         }
       });
 
@@ -409,12 +421,23 @@ document.addEventListener('DOMContentLoaded', function () {
       function updateProgress() {
         const loaded = totalLoaded();
         const percent = Math.min(100, Math.round((loaded / file.size) * 100));
-        const elapsedTime = (new Date().getTime() - startTime) / 1000;
-        const speedBytes = elapsedTime > 0 ? loaded / elapsedTime : 0;
-        const speedMB = (speedBytes / (1024 * 1024)).toFixed(2);
 
         if (progressFill) progressFill.style.width = percent + '%';
-        if (statusText) statusText.textContent = `${label}Yükleniyor: %${percent} (${speedMB} MB/s)`;
+
+        if (percent >= 100) {
+          // Every chunk has reached the server, but it still has to merge them and hand the
+          // result off to the storage driver (this is the slow part for a cloud destination) —
+          // without this message the bar just sits at "%100" with no explanation, which reads
+          // as "frozen" and tempts people to refresh mid-upload.
+          if (statusText) {
+            statusText.textContent = label + 'Dosya işleniyor, lütfen bekleyin... Sayfayı kapatmayın veya yenilemeyin.';
+          }
+        } else {
+          const elapsedTime = (new Date().getTime() - startTime) / 1000;
+          const speedBytes = elapsedTime > 0 ? loaded / elapsedTime : 0;
+          const speedMB = (speedBytes / (1024 * 1024)).toFixed(2);
+          if (statusText) statusText.textContent = `${label}Yükleniyor: %${percent} (${speedMB} MB/s)`;
+        }
       }
 
       function sendChunk(chunkIndex) {

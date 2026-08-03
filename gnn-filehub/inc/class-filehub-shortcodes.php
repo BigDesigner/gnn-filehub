@@ -45,7 +45,7 @@ class FileHub_Shortcodes {
         foreach ( $items as $item ) {
             if ( 'page' === $item->object && (int) $item->object_id === $account_page_id ) {
                 $item->title = is_user_logged_in()
-                    ? __( 'Profil', 'gnn-filehub' )
+                    ? __( 'Hesabım', 'gnn-filehub' )
                     : __( 'Giriş Yap', 'gnn-filehub' );
             }
         }
@@ -76,7 +76,7 @@ class FileHub_Shortcodes {
             return $block_content;
         }
 
-        $label = is_user_logged_in() ? __( 'Profil', 'gnn-filehub' ) : __( 'Giriş Yap', 'gnn-filehub' );
+        $label = is_user_logged_in() ? __( 'Hesabım', 'gnn-filehub' ) : __( 'Giriş Yap', 'gnn-filehub' );
 
         $updated = preg_replace(
             '/(<span class="wp-block-navigation-item__label">)(.*?)(<\/span>)/s',
@@ -116,6 +116,44 @@ class FileHub_Shortcodes {
         }
 
         return $content;
+    }
+
+    /**
+     * Render a Row of Cross-Page Navigation Cards
+     * Lets pages link to each other (e.g. "Dosya Gönder" / "Dosyalarım" from the account page,
+     * or "Hesabım" back from the uploader/manager pages) without the site needing a real nav
+     * menu set up. Any item whose page isn't assigned is silently skipped.
+     *
+     * @param array<array{option:string,title:string,desc:string}> $items
+     * @return string
+     */
+    private function render_nav_cards( array $items ): string {
+        $cards = array();
+
+        foreach ( $items as $item ) {
+            $page_id = (int) get_option( $item['option'], 0 );
+            if ( ! $page_id ) {
+                continue;
+            }
+
+            $url = get_permalink( $page_id );
+            if ( ! $url ) {
+                continue;
+            }
+
+            $cards[] = sprintf(
+                '<a class="filehub-nav-card" href="%s"><div class="filehub-nav-card-title">%s</div><div class="filehub-nav-card-desc">%s</div></a>',
+                esc_url( $url ),
+                esc_html( $item['title'] ),
+                esc_html( $item['desc'] )
+            );
+        }
+
+        if ( empty( $cards ) ) {
+            return '';
+        }
+
+        return '<div class="filehub-nav-cards">' . implode( '', $cards ) . '</div>';
     }
 
     /**
@@ -195,6 +233,12 @@ class FileHub_Shortcodes {
                     </div>
                 </div>
             <?php endif; ?>
+
+            <?php
+            echo $this->render_nav_cards( array(
+                array( 'option' => 'filehub_page_account', 'title' => __( 'Hesabım', 'gnn-filehub' ), 'desc' => __( 'Profilinize ve depolama kotanıza dönün', 'gnn-filehub' ) ),
+            ) );
+            ?>
         </div>
         <?php
         return ob_get_clean();
@@ -224,6 +268,13 @@ class FileHub_Shortcodes {
                     <p><?php esc_html_e( 'Yükleniyor...', 'gnn-filehub' ); ?></p>
                 </div>
             </div>
+
+            <?php
+            echo $this->render_nav_cards( array(
+                array( 'option' => 'filehub_page_uploader', 'title' => __( 'Dosya Gönder', 'gnn-filehub' ), 'desc' => __( 'Yeni bir dosya yükleyin', 'gnn-filehub' ) ),
+                array( 'option' => 'filehub_page_account', 'title' => __( 'Hesabım', 'gnn-filehub' ), 'desc' => __( 'Profilinize ve depolama kotanıza dönün', 'gnn-filehub' ) ),
+            ) );
+            ?>
         </div>
         <?php
         return ob_get_clean();
@@ -490,6 +541,12 @@ class FileHub_Shortcodes {
         ob_start();
         ?>
         <div class="filehub-container">
+            <?php
+            echo $this->render_nav_cards( array(
+                array( 'option' => 'filehub_page_uploader', 'title' => __( 'Dosya Gönder', 'gnn-filehub' ), 'desc' => __( 'Yeni bir dosya yükleyin', 'gnn-filehub' ) ),
+                array( 'option' => 'filehub_page_manager', 'title' => __( 'Dosyalarım', 'gnn-filehub' ), 'desc' => __( 'Yüklediğiniz dosyaları görüntüleyin ve yönetin', 'gnn-filehub' ) ),
+            ) );
+            ?>
             <div class="filehub-card filehub-profile-card">
                 <div class="filehub-profile-header">
                     <div><?php echo get_avatar( $user->ID, 72, '', '', array( 'style' => 'border-radius: 50%;' ) ); ?></div>

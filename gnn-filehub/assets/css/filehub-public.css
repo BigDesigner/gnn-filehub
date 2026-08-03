@@ -290,6 +290,44 @@
   margin: 20px 0;
 }
 
+/* Cross-page navigation cards (e.g. "Dosya Gönder" / "Dosyalarım" on the account page, or a
+   "Hesabım" link back from the uploader/manager pages) — a lightweight substitute for a real
+   nav menu so pages can link to each other without the site needing one set up. */
+.filehub-nav-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  margin: 20px 0;
+}
+
+.filehub-nav-card {
+  display: block;
+  padding: 18px 20px;
+  border: 1px solid var(--filehub-border);
+  border-radius: 8px;
+  background: var(--filehub-bg-soft);
+  text-decoration: none;
+  color: var(--filehub-text);
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.filehub-nav-card:hover {
+  border-color: var(--filehub-theme-color);
+  background: var(--filehub-bg-elevated);
+}
+
+.filehub-nav-card-title {
+  font-weight: 600;
+  font-size: 1.05em;
+  margin-bottom: 4px;
+  color: var(--filehub-theme-color);
+}
+
+.filehub-nav-card-desc {
+  color: var(--filehub-text-muted);
+  font-size: 0.9em;
+}
+
 .filehub-profile-header {
   display: flex;
   align-items: center;
