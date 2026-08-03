@@ -303,20 +303,37 @@ class FileHub_Shortcodes {
      */
     private function render_login_form_markup() {
         ob_start();
+        wp_login_form( array(
+            'echo'           => true,
+            'redirect'       => get_permalink(),
+            'form_id'        => 'filehub-login-form',
+            'label_username' => __( 'Kullanıcı Adı veya E-posta', 'gnn-filehub' ),
+            'label_password' => __( 'Şifre', 'gnn-filehub' ),
+            'label_remember' => __( 'Beni Hatırla', 'gnn-filehub' ),
+            'label_log_in'   => __( 'Giriş Yap', 'gnn-filehub' ),
+            'remember'       => true,
+        ) );
+        $login_form_html = ob_get_clean();
+
+        // wp_login_form() is a lightweight template completely separate from wp-login.php's own
+        // — it never fires WordPress core's `login_form` action, which is exactly what login
+        // security plugins (Defender's reCAPTCHA, Wordfence, etc.) hook to render AND verify
+        // their widget. Without it, those plugins see no proof-of-human on submission and
+        // silently reject the login. Firing it ourselves right before </form> lets them render
+        // (and therefore correctly verify) their widget on this custom form too — this is the
+        // documented fix for using wp_login_form() alongside such plugins.
+        ob_start();
+        do_action( 'login_form' );
+        $extra_fields = ob_get_clean();
+
+        if ( $extra_fields ) {
+            $login_form_html = str_replace( '</form>', $extra_fields . '</form>', $login_form_html );
+        }
+
+        ob_start();
         ?>
         <div class="filehub-auth-form-inner">
-            <?php
-            wp_login_form( array(
-                'echo'           => true,
-                'redirect'       => get_permalink(),
-                'form_id'        => 'filehub-login-form',
-                'label_username' => __( 'Kullanıcı Adı veya E-posta', 'gnn-filehub' ),
-                'label_password' => __( 'Şifre', 'gnn-filehub' ),
-                'label_remember' => __( 'Beni Hatırla', 'gnn-filehub' ),
-                'label_log_in'   => __( 'Giriş Yap', 'gnn-filehub' ),
-                'remember'       => true,
-            ) );
-            ?>
+            <?php echo $login_form_html; ?>
         </div>
         <?php
         return ob_get_clean();
