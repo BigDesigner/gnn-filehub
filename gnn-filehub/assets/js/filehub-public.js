@@ -30,11 +30,52 @@
     return getComputedStyle(document.body).backgroundColor;
   }
 
+  // Themes that explicitly mark their mode (data-theme="dark", a "dark"/"light" class, or the
+  // color-scheme CSS property) are trusted first, since that flips the instant a toggle button
+  // is clicked. Measuring the rendered background is only a fallback for themes that don't
+  // expose any such signal — on some sites the visual background can lag behind the toggle by
+  // a beat (transitions, caching/CSS-combination plugins reordering rules, etc.), so preferring
+  // the theme's own explicit signal is more reliable than inferring from paint state.
+  function detectExplicitThemeSignal() {
+    var html = document.documentElement;
+    var body = document.body;
+
+    var htmlTheme = (html.getAttribute('data-theme') || '').toLowerCase();
+    var bodyTheme = (body.getAttribute('data-theme') || '').toLowerCase();
+    var dt = htmlTheme || bodyTheme;
+    if (dt) {
+      if (dt.indexOf('dark') !== -1) return 'dark';
+      if (dt.indexOf('light') !== -1) return 'light';
+    }
+
+    if (html.classList.contains('dark') || body.classList.contains('dark') || body.classList.contains('dark-mode')) {
+      return 'dark';
+    }
+    if (html.classList.contains('light') || body.classList.contains('light') || body.classList.contains('light-mode')) {
+      return 'light';
+    }
+
+    var colorScheme = getComputedStyle(html).colorScheme;
+    if (colorScheme === 'dark') return 'dark';
+    if (colorScheme === 'light') return 'light';
+
+    return null;
+  }
+
   function applyFilehubTheming() {
     var containers = document.querySelectorAll('.filehub-container');
+    if (!containers.length) return;
+
+    var explicit = detectExplicitThemeSignal();
+
     containers.forEach(function (container) {
-      var bg = getEffectiveBackgroundColor(container.parentElement || document.body);
-      var isDark = relativeLuminance(bg) < 0.5;
+      var isDark;
+      if (explicit) {
+        isDark = explicit === 'dark';
+      } else {
+        var bg = getEffectiveBackgroundColor(container.parentElement || document.body);
+        isDark = relativeLuminance(bg) < 0.5;
+      }
       container.classList.toggle('filehub-theme-dark', isDark);
     });
   }
@@ -58,6 +99,11 @@
         mq.addListener(applyFilehubTheming);
       }
     }
+
+    // Belt-and-suspenders: some toggles change styling through mechanisms our observer can't
+    // see (a swapped stylesheet, a framework re-render). Re-checking every couple of seconds
+    // guarantees we self-correct quickly regardless of the theme's exact mechanism.
+    setInterval( applyFilehubTheming, 2000 );
   }
 
   if (document.readyState === 'loading') {
