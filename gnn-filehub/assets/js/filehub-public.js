@@ -548,24 +548,24 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function renderFileList(container, items) {
     if (!container) return;
-    // The "Kullanıcı ID" column only makes sense on the cross-user "all files" scope (Tüm
-    // Dosyalar) — on a user's own file list it would just repeat their own ID on every row.
-    const showAuthorId = container.getAttribute('data-scope') === 'all';
-    const colCount = showAuthorId ? 7 : 6;
-    const authorIdHeader = showAuthorId ? '<th>Kullanıcı ID</th>' : '';
-    let html = '<div class="filehub-table-wrap"><table class="filehub-table"><thead><tr><th>Dosya Adı</th><th>Boyut</th><th>Sürücü</th>' + authorIdHeader + '<th>Kullanıcı</th><th>İndirme</th><th>İşlem</th></tr></thead><tbody>';
+    // The "Kullanıcı ID" / "Kullanıcı" columns only make sense on the cross-user "all files"
+    // scope (Tüm Dosyalar) — on a user's own file list ("Dosyalarım" / "Yüklediğim Dosyalar")
+    // every row would just repeat their own name and ID, which tells them nothing new.
+    const showOwner = container.getAttribute('data-scope') === 'all';
+    const colCount = showOwner ? 7 : 5;
+    const ownerHeaders = showOwner ? '<th>Kullanıcı ID</th><th>Kullanıcı</th>' : '';
+    let html = '<div class="filehub-table-wrap"><table class="filehub-table"><thead><tr><th>Dosya Adı</th><th>Boyut</th><th>Sürücü</th>' + ownerHeaders + '<th>İndirme</th><th>İşlem</th></tr></thead><tbody>';
     if (items.length === 0) {
       html += '<tr><td colspan="' + colCount + '" style="text-align:center; padding: 20px;">Dosya bulunamadı.</td></tr>';
     } else {
       items.forEach(item => {
         const deleteBtn = item.can_delete ? `<button type="button" class="filehub-action-btn filehub-btn-delete filehub-delete-btn" data-id="${item.id}" data-label="Sil">Sil</button>` : '';
-        const authorIdCell = showAuthorId ? `<td>${item.author_id}</td>` : '';
+        const ownerCells = showOwner ? `<td>${item.author_id}</td><td>${escapeHtml(item.author_name)}</td>` : '';
         html += `<tr>
           <td><strong>${escapeHtml(item.file_name || item.title)}</strong></td>
           <td>${item.file_size}</td>
           <td><span class="filehub-driver-badge">${item.driver}</span></td>
-          ${authorIdCell}
-          <td>${escapeHtml(item.author_name)}</td>
+          ${ownerCells}
           <td>${item.download_count}</td>
           <td>
             <a href="${item.download_url}" class="filehub-action-btn filehub-btn-download" target="_blank">İndir</a>
