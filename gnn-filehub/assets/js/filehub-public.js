@@ -528,7 +528,12 @@ document.addEventListener('DOMContentLoaded', function () {
   function fetchFileList(container) {
     if (!container) return;
     const scope = container.getAttribute('data-scope') || 'own';
-    fetch(filehub_vars.rest_url + 'filehub/v1/files?scope=' + encodeURIComponent(scope), {
+    const perPage = container.getAttribute('data-per-page');
+    let url = filehub_vars.rest_url + 'filehub/v1/files?scope=' + encodeURIComponent(scope);
+    if (perPage) {
+      url += '&per_page=' + encodeURIComponent(perPage);
+    }
+    fetch(url, {
       headers: {
         'X-WP-Nonce': filehub_vars.nonce
       }

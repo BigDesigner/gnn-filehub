@@ -499,10 +499,19 @@ class FileHub_REST_API extends WP_REST_Controller {
         $requested_scope = (string) $request->get_param( 'scope' );
         $scope           = ( 'all' === $requested_scope && $is_admin ) ? 'all' : 'own';
 
+        // Capped, defaults to 100 — the dashboard widget's "last N uploads" list asks for a
+        // small per_page instead of fetching (and then trimming) the full 100-row list.
+        $per_page = absint( $request->get_param( 'per_page' ) );
+        if ( $per_page <= 0 || $per_page > 100 ) {
+            $per_page = 100;
+        }
+
         $query_args = array(
             'post_type'      => 'attachment',
             'post_status'    => 'inherit',
-            'posts_per_page' => 100,
+            'posts_per_page' => $per_page,
+            'orderby'        => 'date',
+            'order'          => 'DESC',
             'meta_key'       => '_filehub_storage_driver',
         );
 

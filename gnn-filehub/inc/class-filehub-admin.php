@@ -13,6 +13,7 @@ class FileHub_Admin {
 
     public function __construct() {
         add_action( 'admin_menu', array( $this, 'add_admin_menu' ) );
+        add_action( 'wp_dashboard_setup', array( $this, 'register_dashboard_widget' ) );
         add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
         add_action( 'admin_init', array( $this, 'register_settings' ) );
         add_action( 'admin_init', array( $this, 'maybe_create_missing_pages' ) );
@@ -74,9 +75,15 @@ class FileHub_Admin {
 
     /**
      * Enqueue Admin Assets
+     * Loads on any FileHub admin page, and also on the main wp-admin Dashboard (index.php) for
+     * admins, since the "GNN Filehub" dashboard widget's recent-files table and delete buttons
+     * reuse the same public JS/CSS the Tüm Dosyalar page does.
      */
     public function enqueue_admin_assets( $hook ) {
-        if ( strpos( $hook, 'filehub' ) === false ) {
+        $is_filehub_page = strpos( $hook, 'filehub' ) !== false;
+        $is_dashboard     = 'index.php' === $hook && current_user_can( 'manage_options' );
+
+        if ( ! $is_filehub_page && ! $is_dashboard ) {
             return;
         }
 
@@ -87,7 +94,9 @@ class FileHub_Admin {
             GNN_FILEHUB_VERSION
         );
 
-        if ( isset( $_GET['page'] ) && 'filehub-files' === $_GET['page'] ) {
+        $needs_file_list_assets = $is_dashboard || ( isset( $_GET['page'] ) && 'filehub-files' === $_GET['page'] );
+
+        if ( $needs_file_list_assets ) {
             wp_enqueue_style(
                 'filehub-public-css',
                 GNN_FILEHUB_URL . 'assets/css/filehub-public.css',
@@ -109,6 +118,110 @@ class FileHub_Admin {
                 'active_driver' => get_option( 'filehub_storage_driver', 'local' ),
             ) );
         }
+    }
+
+    /**
+     * Register the "GNN Filehub" wp-admin Dashboard Widget
+     * Admin-only — regular members can't reach wp-admin at all (see FileHub_Core's lockdown),
+     * so there's no reason to gate this any more tightly than the rest of the plugin's UI.
+     */
+    public function register_dashboard_widget() {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            return;
+        }
+
+        wp_add_dashboard_widget(
+            'filehub_dashboard_widget',
+            __( 'GNN Filehub — Depolama Durumu', 'gnn-filehub' ),
+            array( $this, 'render_dashboard_widget' )
+        );
+    }
+
+    /**
+     * Render the Dashboard Widget: File Count, Storage Usage, Last 10 Uploads
+     */
+    public function render_dashboard_widget() {
+        $stats  = FileHub_Attachment::get_system_stats();
+        $driver = get_option( 'filehub_storage_driver', 'local' );
+
+        list( $usage_label, $usage_bytes, $usage_total_bytes, $usage_note ) = $this->get_dashboard_storage_summary( $driver, $stats );
+        ?>
+        <div class="filehub-dashboard-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-top: 0;">
+            <div class="filehub-card" style="margin: 0;">
+                <h3 style="margin-top:0;"><?php esc_html_e( 'Toplam Dosya Sayısı', 'gnn-filehub' ); ?></h3>
+                <div class="filehub-stat-number"><?php echo esc_html( number_format_i18n( $stats['total_files'] ) ); ?></div>
+            </div>
+            <div class="filehub-card" style="margin: 0;">
+                <h3 style="margin-top:0;"><?php esc_html_e( 'Toplam Disk Alanı', 'gnn-filehub' ); ?></h3>
+                <?php if ( $usage_total_bytes > 0 ) : ?>
+                    <?php $pct = min( 100, round( ( $usage_bytes / $usage_total_bytes ) * 100, 1 ) ); ?>
+                    <div class="filehub-stat-number" style="font-size: 1.3em;"><?php echo esc_html( size_format( $usage_bytes ) . ' / ' . size_format( $usage_total_bytes ) ); ?></div>
+                    <div class="filehub-progress-bar" style="margin-top: 8px;">
+                        <div class="filehub-progress-fill" style="width: <?php echo esc_attr( $pct ); ?>%;"></div>
+                    </div>
+                <?php else : ?>
+                    <div class="filehub-stat-number" style="font-size: 1.3em;"><?php echo esc_html( size_format( $usage_bytes ) ); ?></div>
+                <?php endif; ?>
+                <?php if ( $usage_note ) : ?>
+                    <p class="description" style="margin: 6px 0 0;"><?php echo esc_html( $usage_note ); ?></p>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <h3 style="margin: 18px 0 8px;"><?php esc_html_e( 'Son Yüklenen Dosyalar', 'gnn-filehub' ); ?></h3>
+        <div class="filehub-file-list" data-scope="all" data-per-page="10">
+            <p><?php esc_html_e( 'Yükleniyor...', 'gnn-filehub' ); ?></p>
+        </div>
+        <p style="margin-top: 12px;">
+            <a href="<?php echo esc_url( admin_url( 'admin.php?page=filehub-files' ) ); ?>"><?php esc_html_e( 'Tüm dosyaları görüntüle →', 'gnn-filehub' ); ?></a>
+        </p>
+        <?php
+    }
+
+    /**
+     * Resolve the "Toplam Disk Alanı" Numbers for the Dashboard Widget, per Active Driver
+     * - local: real free/total disk space of the uploads partition.
+     * - r2: Cloudflare's documented 10GB free-tier storage allotment (same assumption already
+     *   used on the Overview page) — R2 has no per-account "total capacity" concept otherwise.
+     * - gdrive: the connected Google account's REAL quota (whatever plan it's actually on),
+     *   queried live from Drive — not an assumed number, per the plugin author's request.
+     *
+     * @return array {0: string label (unused, kept for readability), 1: int used bytes,
+     *                2: int total bytes (0 = no meaningful total to show), 3: string|null note}
+     */
+    private function get_dashboard_storage_summary( string $driver, array $stats ): array {
+        if ( 'gdrive' === $driver ) {
+            $quota = ( new FileHub_Storage_GDrive() )->get_storage_quota();
+
+            if ( ! is_wp_error( $quota ) ) {
+                $note = null;
+                $limit = $quota['limit'];
+                if ( null === $limit ) {
+                    // Unlimited-plan accounts report no limit — nothing meaningful to bar-chart.
+                    return array( 'gdrive', $quota['usage'], 0, __( 'Google Drive hesabınızda sınırsız depolama planı var.', 'gnn-filehub' ) );
+                }
+                return array( 'gdrive', $quota['usage'], $limit, __( 'Google Drive hesabınızın gerçek kotası (yalnızca bu eklentiyle yüklenenler değil).', 'gnn-filehub' ) );
+            }
+
+            // Quota lookup failed (token/network issue) — fall back to our own tracked bytes
+            // against the free-tier assumption, same as the Overview page does.
+            return array( 'gdrive', $stats['driver_bytes']['gdrive'], 15 * 1024 * 1024 * 1024, __( 'Gerçek kota bilgisi alınamadı, varsayılan 15GB ile karşılaştırılıyor.', 'gnn-filehub' ) );
+        }
+
+        if ( 'r2' === $driver ) {
+            return array( 'r2', $stats['driver_bytes']['r2'], 10 * 1024 * 1024 * 1024, __( 'Cloudflare R2 ücretsiz katman varsayımı (10GB).', 'gnn-filehub' ) );
+        }
+
+        // Local: compare our own tracked usage against the real free space left on that disk.
+        $upload_dir = wp_upload_dir();
+        $free_bytes = @disk_free_space( $upload_dir['basedir'] );
+        $used_bytes = $stats['driver_bytes']['local'];
+
+        if ( false === $free_bytes ) {
+            return array( 'local', $used_bytes, 0, null );
+        }
+
+        return array( 'local', $used_bytes, $used_bytes + $free_bytes, __( 'Sunucu diskindeki gerçek boş alana göre.', 'gnn-filehub' ) );
     }
 
     /**

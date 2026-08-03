@@ -354,6 +354,59 @@ class FileHub_Storage_GDrive implements FileHub_Storage_Interface {
     }
 
     /**
+     * Get the Google Account's Real Storage Quota (Not an Assumed Free-Tier Number)
+     * Queries Drive's own `about` endpoint so the dashboard reflects whatever plan is actually
+     * on the connected account (free 15GB, a paid Google One plan, Workspace, ...) instead of
+     * always assuming the free tier. Cached for an hour since it rarely changes and costs an
+     * extra API round trip otherwise.
+     *
+     * @return array|WP_Error {limit: int|null (bytes, null = unlimited), usage: int (bytes)}
+     */
+    public function get_storage_quota() {
+        $cache_key = 'filehub_gdrive_storage_quota';
+        $cached    = get_transient( $cache_key );
+        if ( false !== $cached ) {
+            return $cached;
+        }
+
+        $access_token = $this->get_access_token();
+        if ( is_wp_error( $access_token ) ) {
+            return $access_token;
+        }
+
+        $response = wp_remote_get( 'https://www.googleapis.com/drive/v3/about?fields=storageQuota', array(
+            'headers' => array( 'Authorization' => 'Bearer ' . $access_token ),
+            'timeout' => 30,
+        ) );
+
+        if ( is_wp_error( $response ) ) {
+            return $response;
+        }
+
+        $data = json_decode( wp_remote_retrieve_body( $response ), true );
+        if ( empty( $data['storageQuota'] ) ) {
+            $reason = ! empty( $data['error']['message'] ) ? $data['error']['message'] : wp_remote_retrieve_response_code( $response );
+            return new WP_Error(
+                'filehub_gdrive_quota_failed',
+                sprintf(
+                    /* translators: %s: raw error reason returned by Google */
+                    __( 'Google Drive kota bilgisi alınamadı: %s', 'gnn-filehub' ),
+                    $reason
+                )
+            );
+        }
+
+        $result = array(
+            // Some plans (rare) report no limit at all — treat as unlimited rather than 0.
+            'limit' => isset( $data['storageQuota']['limit'] ) ? (int) $data['storageQuota']['limit'] : null,
+            'usage' => isset( $data['storageQuota']['usage'] ) ? (int) $data['storageQuota']['usage'] : 0,
+        );
+
+        set_transient( $cache_key, $result, HOUR_IN_SECONDS );
+        return $result;
+    }
+
+    /**
      * Delete File from Google Drive
      */
     public function delete_file( string $file_identifier ) {
