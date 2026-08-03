@@ -127,6 +127,28 @@ document.addEventListener('DOMContentLoaded', function () {
   // Cache of the last fetched (unfiltered) rows per file-list container, for live search.
   const fileListCache = new WeakMap();
 
+  // Add a show/hide toggle to every password field inside FileHub forms — covers the
+  // native wp_login_form() password input as well as our own register/password-change fields.
+  document.querySelectorAll('.filehub-container input[type="password"]').forEach(function (input) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'filehub-password-wrap';
+    input.parentNode.insertBefore(wrapper, input);
+    wrapper.appendChild(input);
+
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'filehub-password-toggle';
+    toggle.setAttribute('aria-label', 'Şifreyi göster/gizle');
+    toggle.textContent = '👁';
+    wrapper.appendChild(toggle);
+
+    toggle.addEventListener('click', function () {
+      const showing = input.type === 'text';
+      input.type = showing ? 'password' : 'text';
+      toggle.textContent = showing ? '👁' : '🙈';
+    });
+  });
+
   // Drag & Drop File Upload
   if (dropZone && fileInput) {
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
