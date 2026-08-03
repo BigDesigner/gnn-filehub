@@ -119,12 +119,30 @@ class FileHub_Shortcodes {
     }
 
     /**
+     * Inline SVG Icons for Nav Cards
+     * Real vector icons (not emoji) so they inherit `currentColor` and automatically pick up
+     * the theme's accent color via the `.filehub-nav-card-icon` wrapper's `color`.
+     *
+     * @param string $key One of: upload, files, account.
+     * @return string
+     */
+    private function get_nav_card_icon( string $key ): string {
+        $icons = array(
+            'upload' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3M12 3L7.5 7.5M12 3l4.5 4.5"></path><path d="M3 15v3a3 3 0 0 0 3 3h12a3 3 0 0 0 3-3v-3"></path></svg>',
+            'files'  => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"></path></svg>',
+            'account' => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6"></path></svg>',
+        );
+
+        return isset( $icons[ $key ] ) ? $icons[ $key ] : $icons['files'];
+    }
+
+    /**
      * Render a Row of Cross-Page Navigation Cards
      * Lets pages link to each other (e.g. "Dosya Gönder" / "Dosyalarım" from the account page,
      * or "Hesabım" back from the uploader/manager pages) without the site needing a real nav
      * menu set up. Any item whose page isn't assigned is silently skipped.
      *
-     * @param array<array{option:string,title:string,desc:string}> $items
+     * @param array<array{option:string,title:string,desc:string,icon?:string}> $items
      * @return string
      */
     private function render_nav_cards( array $items ): string {
@@ -142,8 +160,9 @@ class FileHub_Shortcodes {
             }
 
             $cards[] = sprintf(
-                '<a class="filehub-nav-card" href="%s"><div class="filehub-nav-card-title">%s</div><div class="filehub-nav-card-desc">%s</div></a>',
+                '<a class="filehub-nav-card" href="%s"><span class="filehub-nav-card-icon">%s</span><span class="filehub-nav-card-body"><span class="filehub-nav-card-title">%s</span><span class="filehub-nav-card-desc">%s</span></span></a>',
                 esc_url( $url ),
+                $this->get_nav_card_icon( isset( $item['icon'] ) ? $item['icon'] : 'files' ),
                 esc_html( $item['title'] ),
                 esc_html( $item['desc'] )
             );
@@ -201,6 +220,11 @@ class FileHub_Shortcodes {
         ob_start();
         ?>
         <div class="filehub-container">
+            <?php
+            echo $this->render_nav_cards( array(
+                array( 'option' => 'filehub_page_account', 'title' => __( 'Hesabım', 'gnn-filehub' ), 'desc' => __( 'Profilinize ve depolama kotanıza dönün', 'gnn-filehub' ), 'icon' => 'account' ),
+            ) );
+            ?>
             <div class="filehub-card filehub-uploader">
                 <h3><?php esc_html_e( 'Dosya Yükle', 'gnn-filehub' ); ?></h3>
                 <div id="filehub-dropzone" class="filehub-dropzone">
@@ -233,12 +257,6 @@ class FileHub_Shortcodes {
                     </div>
                 </div>
             <?php endif; ?>
-
-            <?php
-            echo $this->render_nav_cards( array(
-                array( 'option' => 'filehub_page_account', 'title' => __( 'Hesabım', 'gnn-filehub' ), 'desc' => __( 'Profilinize ve depolama kotanıza dönün', 'gnn-filehub' ) ),
-            ) );
-            ?>
         </div>
         <?php
         return ob_get_clean();
@@ -259,6 +277,12 @@ class FileHub_Shortcodes {
         ob_start();
         ?>
         <div class="filehub-container">
+            <?php
+            echo $this->render_nav_cards( array(
+                array( 'option' => 'filehub_page_uploader', 'title' => __( 'Dosya Gönder', 'gnn-filehub' ), 'desc' => __( 'Yeni bir dosya yükleyin', 'gnn-filehub' ), 'icon' => 'upload' ),
+                array( 'option' => 'filehub_page_account', 'title' => __( 'Hesabım', 'gnn-filehub' ), 'desc' => __( 'Profilinize ve depolama kotanıza dönün', 'gnn-filehub' ), 'icon' => 'account' ),
+            ) );
+            ?>
             <div class="filehub-card filehub-manager">
                 <div class="filehub-manager-toolbar">
                     <h3><?php esc_html_e( 'Dosyalarım', 'gnn-filehub' ); ?></h3>
@@ -268,13 +292,6 @@ class FileHub_Shortcodes {
                     <p><?php esc_html_e( 'Yükleniyor...', 'gnn-filehub' ); ?></p>
                 </div>
             </div>
-
-            <?php
-            echo $this->render_nav_cards( array(
-                array( 'option' => 'filehub_page_uploader', 'title' => __( 'Dosya Gönder', 'gnn-filehub' ), 'desc' => __( 'Yeni bir dosya yükleyin', 'gnn-filehub' ) ),
-                array( 'option' => 'filehub_page_account', 'title' => __( 'Hesabım', 'gnn-filehub' ), 'desc' => __( 'Profilinize ve depolama kotanıza dönün', 'gnn-filehub' ) ),
-            ) );
-            ?>
         </div>
         <?php
         return ob_get_clean();
@@ -532,19 +549,16 @@ class FileHub_Shortcodes {
 
         wp_enqueue_style( 'filehub-public-css' );
 
-        $user          = wp_get_current_user();
-        $stats         = FileHub_Attachment::get_user_stats( $user->ID );
-        $user_quota_mb = (int) get_user_meta( $user->ID, '_filehub_user_quota_mb', true ) ?: 500; // Default 500MB quota
-        $quota_bytes   = $user_quota_mb * 1024 * 1024;
-        $pct_used      = $quota_bytes > 0 ? min( 100, round( ( $stats['total_bytes'] / $quota_bytes ) * 100, 1 ) ) : 0;
+        $user  = wp_get_current_user();
+        $stats = FileHub_Attachment::get_user_stats( $user->ID );
 
         ob_start();
         ?>
         <div class="filehub-container">
             <?php
             echo $this->render_nav_cards( array(
-                array( 'option' => 'filehub_page_uploader', 'title' => __( 'Dosya Gönder', 'gnn-filehub' ), 'desc' => __( 'Yeni bir dosya yükleyin', 'gnn-filehub' ) ),
-                array( 'option' => 'filehub_page_manager', 'title' => __( 'Dosyalarım', 'gnn-filehub' ), 'desc' => __( 'Yüklediğiniz dosyaları görüntüleyin ve yönetin', 'gnn-filehub' ) ),
+                array( 'option' => 'filehub_page_uploader', 'title' => __( 'Dosya Gönder', 'gnn-filehub' ), 'desc' => __( 'Yeni bir dosya yükleyin', 'gnn-filehub' ), 'icon' => 'upload' ),
+                array( 'option' => 'filehub_page_manager', 'title' => __( 'Dosyalarım', 'gnn-filehub' ), 'desc' => __( 'Yüklediğiniz dosyaları görüntüleyin ve yönetin', 'gnn-filehub' ), 'icon' => 'files' ),
             ) );
             ?>
             <div class="filehub-card filehub-profile-card">
@@ -560,10 +574,14 @@ class FileHub_Shortcodes {
 
                 <h3><?php esc_html_e( 'Depolama Kotası ve Kullanım', 'gnn-filehub' ); ?></h3>
                 <p style="margin-bottom: 8px;">
-                    <strong><?php echo esc_html( size_format( $stats['total_bytes'] ) ); ?></strong> / <?php echo esc_html( $user_quota_mb ); ?> MB (%<?php echo esc_html( $pct_used ); ?> Dolu)
+                    <?php if ( $stats['quota_bytes'] > 0 ) : ?>
+                        <strong><?php echo esc_html( $stats['used_formatted'] ); ?></strong> / <?php echo esc_html( $stats['quota_formatted'] ); ?> (%<?php echo esc_html( $stats['percentage'] ); ?> Dolu)
+                    <?php else : ?>
+                        <strong><?php echo esc_html( $stats['used_formatted'] ); ?></strong> (<?php esc_html_e( 'Sınırsız kota', 'gnn-filehub' ); ?>)
+                    <?php endif; ?>
                 </p>
                 <div class="filehub-progress-bar">
-                    <div class="filehub-progress-fill" style="width: <?php echo esc_attr( $pct_used ); ?>%;"></div>
+                    <div class="filehub-progress-fill" style="width: <?php echo esc_attr( $stats['percentage'] ); ?>%;"></div>
                 </div>
 
                 <div class="filehub-profile-stats">
@@ -579,8 +597,12 @@ class FileHub_Shortcodes {
 
                 <hr style="border: 0; border-top: 1px solid var(--filehub-border-soft); margin: 20px 0 15px;">
 
-                <h3><?php esc_html_e( 'Şifre Güncelleme', 'gnn-filehub' ); ?></h3>
-                <?php echo $this->render_password_change_form_markup(); ?>
+                <details class="filehub-collapsible">
+                    <summary><?php esc_html_e( 'Şifre Güncelleme', 'gnn-filehub' ); ?></summary>
+                    <div class="filehub-collapsible-content">
+                        <?php echo $this->render_password_change_form_markup(); ?>
+                    </div>
+                </details>
             </div>
         </div>
         <?php

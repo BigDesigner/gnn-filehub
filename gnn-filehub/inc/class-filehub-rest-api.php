@@ -120,6 +120,16 @@ class FileHub_REST_API extends WP_REST_Controller {
             return new WP_REST_Response( array( 'error' => __( 'Bu dosya uzantısına izin verilmiyor.', 'gnn-filehub' ) ), 400 );
         }
 
+        // Per-File Upload Size Limit
+        $max_upload_bytes = FileHub_Attachment::get_max_upload_bytes();
+        if ( $max_upload_bytes > 0 && (int) $file['size'] > $max_upload_bytes ) {
+            return new WP_REST_Response( array( 'error' => sprintf(
+                /* translators: %s: maximum allowed file size, formatted (e.g. "500 MB") */
+                __( 'Dosya boyutu izin verilen limiti (%s) aşıyor.', 'gnn-filehub' ),
+                size_format( $max_upload_bytes )
+            ) ), 400 );
+        }
+
         // Selected Storage Driver
         $driver_name = get_option( 'filehub_storage_driver', 'local' );
         switch ( $driver_name ) {
@@ -164,6 +174,7 @@ class FileHub_REST_API extends WP_REST_Controller {
         $chunk_index  = absint( $request->get_param( 'chunk_index' ) );
         $total_chunks = absint( $request->get_param( 'total_chunks' ) );
         $filename     = FileHub_Attachment::sanitize_upload_filename( (string) $request->get_param( 'filename' ) );
+        $total_size   = absint( $request->get_param( 'total_size' ) );
 
         if ( empty( $file_id ) || empty( $filename ) || $total_chunks <= 0 ) {
             return new WP_REST_Response( array( 'error' => __( 'Görünüşe göre geçersiz parça bilgileri gönderildi.', 'gnn-filehub' ) ), 400 );
@@ -174,6 +185,18 @@ class FileHub_REST_API extends WP_REST_Controller {
         $ext          = strtolower( pathinfo( $filename, PATHINFO_EXTENSION ) );
         if ( ! in_array( $ext, $allowed_exts, true ) ) {
             return new WP_REST_Response( array( 'error' => __( 'Bu dosya uzantısına izin verilmiyor.', 'gnn-filehub' ) ), 400 );
+        }
+
+        // Per-File Upload Size Limit — checked against the client-reported total size up front
+        // (cheap, saves accepting chunks we'll reject anyway) and re-verified against the real
+        // assembled file size in merge_uploaded_chunks() once every part is actually on disk.
+        $max_upload_bytes = FileHub_Attachment::get_max_upload_bytes();
+        if ( $max_upload_bytes > 0 && $total_size > 0 && $total_size > $max_upload_bytes ) {
+            return new WP_REST_Response( array( 'error' => sprintf(
+                /* translators: %s: maximum allowed file size, formatted (e.g. "500 MB") */
+                __( 'Dosya boyutu izin verilen limiti (%s) aşıyor.', 'gnn-filehub' ),
+                size_format( $max_upload_bytes )
+            ) ), 400 );
         }
 
         // User Quota Validation Check
@@ -282,6 +305,19 @@ class FileHub_REST_API extends WP_REST_Controller {
         }
         @rmdir( $chunk_dir );
 
+        // Re-verify the real assembled size against the per-file limit — the client-reported
+        // total_size checked in handle_upload_chunk() is only ever a fast, non-authoritative
+        // pre-check; this is the value that actually matters.
+        $max_upload_bytes = FileHub_Attachment::get_max_upload_bytes();
+        if ( $max_upload_bytes > 0 && filesize( $assembled_tmp ) > $max_upload_bytes ) {
+            @unlink( $assembled_tmp );
+            return new WP_REST_Response( array( 'error' => sprintf(
+                /* translators: %s: maximum allowed file size, formatted (e.g. "500 MB") */
+                __( 'Dosya boyutu izin verilen limiti (%s) aşıyor.', 'gnn-filehub' ),
+                size_format( $max_upload_bytes )
+            ) ), 400 );
+        }
+
         // Build file array for Storage Driver
         $final_file_info = array(
             'name'     => $filename,
@@ -353,6 +389,18 @@ class FileHub_REST_API extends WP_REST_Controller {
             return new WP_REST_Response( array( 'error' => __( 'Bu dosya uzantısına izin verilmiyor.', 'gnn-filehub' ) ), 400 );
         }
 
+        // Per-File Upload Size Limit — checked against the client-reported size up front (the
+        // real, server-verified size is re-checked in handle_r2_finalize once the object
+        // actually exists on R2, same pattern as the quota check just below).
+        $max_upload_bytes = FileHub_Attachment::get_max_upload_bytes();
+        if ( $max_upload_bytes > 0 && $file_size > $max_upload_bytes ) {
+            return new WP_REST_Response( array( 'error' => sprintf(
+                /* translators: %s: maximum allowed file size, formatted (e.g. "500 MB") */
+                __( 'Dosya boyutu izin verilen limiti (%s) aşıyor.', 'gnn-filehub' ),
+                size_format( $max_upload_bytes )
+            ) ), 400 );
+        }
+
         $user_stats = FileHub_Attachment::get_user_stats( $user_id );
         if ( $user_stats['quota_bytes'] > 0 && ( $user_stats['total_bytes'] + $file_size ) > $user_stats['quota_bytes'] ) {
             return new WP_REST_Response( array( 'error' => __( 'Depolama kotanızı aşıyor.', 'gnn-filehub' ) ), 400 );
@@ -402,6 +450,16 @@ class FileHub_REST_API extends WP_REST_Controller {
 
         if ( is_wp_error( $meta ) ) {
             return new WP_REST_Response( array( 'error' => $meta->get_error_message() ), 500 );
+        }
+
+        $max_upload_bytes = FileHub_Attachment::get_max_upload_bytes();
+        if ( $max_upload_bytes > 0 && $meta['file_size'] > $max_upload_bytes ) {
+            $driver->delete_file( $key );
+            return new WP_REST_Response( array( 'error' => sprintf(
+                /* translators: %s: maximum allowed file size, formatted (e.g. "500 MB") */
+                __( 'Dosya boyutu izin verilen limiti (%s) aşıyor, dosya kaldırıldı.', 'gnn-filehub' ),
+                size_format( $max_upload_bytes )
+            ) ), 400 );
         }
 
         $user_stats = FileHub_Attachment::get_user_stats( $user_id );

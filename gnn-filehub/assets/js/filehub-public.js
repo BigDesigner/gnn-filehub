@@ -452,6 +452,7 @@ document.addEventListener('DOMContentLoaded', function () {
           formData.append('chunk_index', chunkIndex);
           formData.append('total_chunks', totalChunks);
           formData.append('filename', file.name);
+          formData.append('total_size', file.size);
 
           const xhr = new XMLHttpRequest();
 
@@ -543,7 +544,7 @@ document.addEventListener('DOMContentLoaded', function () {
       html += '<tr><td colspan="6" style="text-align:center; padding: 20px;">Dosya bulunamadı.</td></tr>';
     } else {
       items.forEach(item => {
-        const deleteBtn = item.can_delete ? `<button type="button" class="button button-link-delete button-small filehub-delete-btn" data-id="${item.id}" style="color:#b32d2e; margin-left:8px;">Sil</button>` : '';
+        const deleteBtn = item.can_delete ? `<button type="button" class="filehub-action-btn filehub-btn-delete filehub-delete-btn" data-id="${item.id}" data-label="Sil">Sil</button>` : '';
         html += `<tr>
           <td><strong>${escapeHtml(item.file_name || item.title)}</strong></td>
           <td>${item.file_size}</td>
@@ -551,7 +552,7 @@ document.addEventListener('DOMContentLoaded', function () {
           <td>${escapeHtml(item.author_name)}</td>
           <td>${item.download_count}</td>
           <td>
-            <a href="${item.download_url}" class="button button-secondary button-small" target="_blank">İndir</a>
+            <a href="${item.download_url}" class="filehub-action-btn filehub-btn-download" target="_blank">İndir</a>
             ${deleteBtn}
           </td>
         </tr>`;
@@ -560,13 +561,27 @@ document.addEventListener('DOMContentLoaded', function () {
     html += '</tbody></table></div>';
     container.innerHTML = html;
 
-    // Attach Delete Event Listeners (scoped to this container only)
+    // Attach Delete Event Listeners (scoped to this container only). Instead of a native
+    // browser confirm() popup, the button itself flips into a "confirm?" state on first click
+    // and only actually deletes on the second — reverts automatically if left alone.
     container.querySelectorAll('.filehub-delete-btn').forEach(btn => {
+      let revertTimer = null;
       btn.addEventListener('click', function () {
         const fileId = this.getAttribute('data-id');
-        if (confirm('Bu dosyayı kalıcı olarak silmek istediğinizden emin misiniz?')) {
+
+        if (this.classList.contains('filehub-btn-confirming')) {
+          clearTimeout(revertTimer);
+          this.textContent = '...';
           deleteFile(fileId, container);
+          return;
         }
+
+        this.classList.add('filehub-btn-confirming');
+        this.textContent = 'Onayla?';
+        revertTimer = setTimeout(() => {
+          this.classList.remove('filehub-btn-confirming');
+          this.textContent = this.getAttribute('data-label');
+        }, 3000);
       });
     });
   }

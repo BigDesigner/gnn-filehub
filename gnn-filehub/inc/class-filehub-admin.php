@@ -120,6 +120,8 @@ class FileHub_Admin {
         register_setting( 'filehub_general_group', 'filehub_strict_mime' );
         register_setting( 'filehub_general_group', 'filehub_auto_rename' );
         register_setting( 'filehub_general_group', 'filehub_allowed_extensions' );
+        register_setting( 'filehub_general_group', 'filehub_default_quota_mb' );
+        register_setting( 'filehub_general_group', 'filehub_max_upload_mb' );
 
         // Automatic Page Assignments
         register_setting( 'filehub_pages_group', 'filehub_page_account' );
@@ -342,6 +344,20 @@ class FileHub_Admin {
                         <td>
                             <input type="text" name="filehub_allowed_extensions" class="large-text" value="<?php echo esc_attr( get_option( 'filehub_allowed_extensions', 'jpg,jpeg,png,gif,pdf,zip,doc,docx,xlsx' ) ); ?>">
                             <p class="description"><?php esc_html_e( 'Virgülle ayrılmış dosya uzantıları listesi.', 'gnn-filehub' ); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e( 'Varsayılan Depolama Kotası (MB)', 'gnn-filehub' ); ?></th>
+                        <td>
+                            <input type="number" name="filehub_default_quota_mb" value="<?php echo esc_attr( get_option( 'filehub_default_quota_mb', 500 ) ); ?>" min="0" step="1" class="regular-text">
+                            <p class="description"><?php esc_html_e( 'Bir kullanıcı için özel kota tanımlanmadıysa geçerli olan genel depolama sınırı. 0 = sınırsız.', 'gnn-filehub' ); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e( 'Dosya Başına Yükleme Limiti (MB)', 'gnn-filehub' ); ?></th>
+                        <td>
+                            <input type="number" name="filehub_max_upload_mb" value="<?php echo esc_attr( get_option( 'filehub_max_upload_mb', 0 ) ); ?>" min="0" step="1" class="regular-text">
+                            <p class="description"><?php esc_html_e( 'Tek bir dosya için izin verilen maksimum boyut. 0 = sınırsız.', 'gnn-filehub' ); ?></p>
                         </td>
                     </tr>
                 </table>
@@ -864,6 +880,8 @@ class FileHub_Admin {
             'filehub_strict_mime'          => 'checkbox',
             'filehub_auto_rename'          => 'checkbox',
             'filehub_allowed_extensions'   => 'text',
+            'filehub_default_quota_mb'     => 'number',
+            'filehub_max_upload_mb'        => 'number',
             'filehub_page_account'         => 'page_id',
             'filehub_page_uploader'        => 'page_id',
             'filehub_page_manager'         => 'page_id',
@@ -898,6 +916,9 @@ class FileHub_Admin {
 
             case 'driver':
                 return in_array( $value, array( 'local', 'r2', 'gdrive' ), true ) ? $value : 'local';
+
+            case 'number':
+                return absint( $value );
 
             case 'text':
             default:

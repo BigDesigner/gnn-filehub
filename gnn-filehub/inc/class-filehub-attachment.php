@@ -91,6 +91,16 @@ class FileHub_Attachment {
     }
 
     /**
+     * Get the Configured Maximum Per-File Upload Size (in Bytes)
+     *
+     * @return int Byte limit, or 0 for unlimited.
+     */
+    public static function get_max_upload_bytes(): int {
+        $max_upload_mb = (int) get_option( 'filehub_max_upload_mb', 0 );
+        return $max_upload_mb > 0 ? $max_upload_mb * 1024 * 1024 : 0;
+    }
+
+    /**
      * Get Per-User File Usage Statistics
      *
      * @param int $user_id
