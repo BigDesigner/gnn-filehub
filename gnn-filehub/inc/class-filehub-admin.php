@@ -36,8 +36,8 @@ class FileHub_Admin {
      */
     public function add_admin_menu() {
         add_menu_page(
-            __( 'FileHub - Genel Bakış', 'gnn-filehub' ),
-            'FileHub',
+            __( 'GNN Filehub - Genel Bakış', 'gnn-filehub' ),
+            'GNN Filehub',
             'manage_options',
             'filehub',
             array( $this, 'render_overview_page' ),
@@ -47,7 +47,7 @@ class FileHub_Admin {
 
         add_submenu_page(
             'filehub',
-            __( 'FileHub - Genel Bakış', 'gnn-filehub' ),
+            __( 'GNN Filehub - Genel Bakış', 'gnn-filehub' ),
             __( 'Genel Bakış', 'gnn-filehub' ),
             'manage_options',
             'filehub',
@@ -56,7 +56,7 @@ class FileHub_Admin {
 
         add_submenu_page(
             'filehub',
-            __( 'FileHub - Tüm Dosyalar', 'gnn-filehub' ),
+            __( 'GNN Filehub - Tüm Dosyalar', 'gnn-filehub' ),
             __( 'Tüm Dosyalar', 'gnn-filehub' ),
             'manage_options',
             'filehub-files',
@@ -65,7 +65,7 @@ class FileHub_Admin {
 
         add_submenu_page(
             'filehub',
-            __( 'FileHub - Ayarlar', 'gnn-filehub' ),
+            __( 'GNN Filehub - Ayarlar', 'gnn-filehub' ),
             __( 'Ayarlar', 'gnn-filehub' ),
             'manage_options',
             'filehub-settings',
