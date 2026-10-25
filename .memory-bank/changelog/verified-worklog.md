@@ -135,3 +135,7 @@ Evidence: 32/32 real WordPress scenarios (WordPress 7.0.2, PHP 8.5.8, fresh isol
 ## 2026-10-25: Publication policy
 
 User explicitly requested commit/push and GitHub-generated release packages. Local ZIP/checksum artifacts and their current links were removed. Source verification evidence is retained. Publish the changes on main and tag v1.7.0 to trigger the existing release workflow.
+
+## 2026-10-26: GitHub CI compatibility correction
+
+Release run 40223996698 and Verify run 40223996664 failed only on PHP 8.0 / WordPress 6.0: R03 called get_status() on a pre-dispatch WP_Error. WordPress 6.0 returns that error before REST response normalization; the production privacy guard correctly denies the request. Normalize the error in the assertion, retaining the exact HTTP 404 requirement. PHP 8.3/latest and 8.4/latest CI jobs passed. Corrected test report backend labeling so MySQL CI no longer claims SQLite. No plugin source or version change. Re-run Release via workflow_dispatch on main after pushing the test fix; preserve the existing v1.7.0 tag and let GitHub generate the package.

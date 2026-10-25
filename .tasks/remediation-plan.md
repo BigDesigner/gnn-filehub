@@ -52,3 +52,10 @@ Date: 2026-10-25. User authorized implementation of every audit group after ADR/
 The user authorized commit and push on 2026-10-25. Distribution packages are produced by GitHub Actions, not local builds. No production deployment or external service configuration is part of this step.
 
 Suggested commit: `fix(filehub): secure upload sessions and close audit findings`
+
+## CI follow-up — 2026-10-26
+
+- [x] Diagnose failed Release 40223996698 via gh: only R03 on WordPress 6.0 fails because the test assumes a normalized response.
+- [x] Normalize WP_Error to a REST response before asserting HTTP 404; retain privacy coverage.
+- [x] Report the actual database backend in test evidence.
+- [ ] Confirm corrected GitHub matrix and v1.7.0 package publication.

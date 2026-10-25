@@ -77,7 +77,10 @@ test_case('R02','Real local session validates, commits once, and denies another 
 test_case('R03','Standard media collection and single routes hide FileHub records',function() {
     list($id)=finish_fixture();
     wp_set_current_user(0);
-    $single=rest_get_server()->dispatch(new WP_REST_Request('GET','/wp/v2/media/'.$id)); expect($single->get_status()===404);
+    $single=rest_get_server()->dispatch(new WP_REST_Request('GET','/wp/v2/media/'.$id));
+    // WP 6.0 returns pre-dispatch WP_Error values before response normalization.
+    if(is_wp_error($single))$single=rest_convert_error_to_response($single);
+    expect($single->get_status()===404);
     $list=rest_get_server()->dispatch(new WP_REST_Request('GET','/wp/v2/media'));
     expect(!in_array($id,array_column($list->get_data(),'id'),true));
     wp_set_current_user($GLOBALS['administrator']);
@@ -279,7 +282,8 @@ $page_id=$page?$page->ID:wp_insert_post(array('post_type'=>'page','post_status'=
 file_put_contents($runtime.'/http-fixtures.json',wp_json_encode(array('username'=>get_userdata($owner)->user_login,'password'=>'Changed-Synthetic-Password!','owner'=>$owner,'page'=>$page_id)));
 $noise=ob_get_clean();
 $failed=count(array_filter($results,function($r){return !$r['passed'];}));
-$report=array('wordpress'=>get_bloginfo('version'),'php'=>PHP_VERSION,'mode'=>'real WordPress, fresh SQLite database, mocked external HTTP','passed'=>count($results)-$failed,'failed'=>$failed,'tests'=>$results);
+$backend=defined('DB_ENGINE') && DB_ENGINE==='sqlite'?'SQLite':'MySQL';
+$report=array('wordpress'=>get_bloginfo('version'),'php'=>PHP_VERSION,'mode'=>'real WordPress, isolated '.$backend.' database, mocked external HTTP','passed'=>count($results)-$failed,'failed'=>$failed,'tests'=>$results);
 file_put_contents($runtime.'/regression-results.json',wp_json_encode($report,JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE));
 echo wp_json_encode($report,JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE),"\n";
 if($noise)fwrite(STDERR,substr($noise,0,2000));
