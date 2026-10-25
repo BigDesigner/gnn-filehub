@@ -139,3 +139,5 @@ User explicitly requested commit/push and GitHub-generated release packages. Loc
 ## 2026-10-26: GitHub CI compatibility correction
 
 Release run 40223996698 and Verify run 40223996664 failed only on PHP 8.0 / WordPress 6.0: R03 called get_status() on a pre-dispatch WP_Error. WordPress 6.0 returns that error before REST response normalization; the production privacy guard correctly denies the request. Normalize the error in the assertion, retaining the exact HTTP 404 requirement. PHP 8.3/latest and 8.4/latest CI jobs passed. Corrected test report backend labeling so MySQL CI no longer claims SQLite. No plugin source or version change. Re-run Release via workflow_dispatch on main after pushing the test fix; preserve the existing v1.7.0 tag and let GitHub generate the package.
+
+GitHub Release run 40238093405 passed PHP 8.0/WordPress 6.0, PHP 8.3/latest and PHP 8.4/latest including HTTP/client/concurrency checks. GitHub built, inspected and published gnn-filehub-v1.7.0.zip. Fix commit: 1cea15e. No production plugin source changed.

@@ -58,4 +58,4 @@ Suggested commit: `fix(filehub): secure upload sessions and close audit findings
 - [x] Diagnose failed Release 40223996698 via gh: only R03 on WordPress 6.0 fails because the test assumes a normalized response.
 - [x] Normalize WP_Error to a REST response before asserting HTTP 404; retain privacy coverage.
 - [x] Report the actual database backend in test evidence.
-- [ ] Confirm corrected GitHub matrix and v1.7.0 package publication.
+- [x] Corrected Release run 40238093405 passed all three matrix jobs and published gnn-filehub-v1.7.0.zip on GitHub.

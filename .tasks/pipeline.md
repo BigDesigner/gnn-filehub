@@ -1,6 +1,6 @@
 # Project Sprint Pipeline
 
-Current sprint: **v1.7.0 security remediation — implemented, local verification passed**. See the current checklist and `.tasks/remediation-plan.md` for evidence.
+Current sprint: **v1.7.0 security remediation — implemented, local and GitHub matrix verification passed; v1.7.0 published**. See the current checklist and `.tasks/remediation-plan.md` for evidence.
 
 ## Historical Sprint: v0.3.0-alpha (earlier Playground checks)
 
