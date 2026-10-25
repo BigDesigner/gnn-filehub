@@ -1,119 +1,1005 @@
-# Copyright (C) 2026 BigDesigner
-# This file is distributed under the same license as the GNN Filehub plugin.
 msgid ""
 msgstr ""
-"Project-Id-Version: GNN Filehub 1.6.1\n"
-"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/gnn-filehub\n"
-"Last-Translator: BigDesigner <info@gnn.com.tr>\n"
-"Language-Team: Turkish <info@gnn.com.tr>\n"
+"Project-Id-Version: GNN Filehub 1.7.0\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-08-02T22:10:00+00:00\n"
-"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
-"X-Generator: WP-CLI 2.8.0\n"
-"X-Domain: gnn-filehub\n"
 
-#. Plugin Name of the plugin
-msgid "GNN Filehub"
+msgid "%d eksik sayfa otomatik olarak oluşturuldu ve atandı."
 msgstr ""
 
-#. Plugin URI of the plugin
-msgid "https://gnn.com.tr"
+msgid "-- Sayfa Seçin --"
 msgstr ""
 
-#. Description of the plugin
-msgid "100% WordPress Core Native, zero-dependency file upload and multi-cloud storage management plugin."
+msgid "64 bit PHP gereklidir."
 msgstr ""
 
-#. Author of the plugin
-msgid "BigDesigner"
+msgid "Adı"
 msgstr ""
 
-#: gnn-filehub-nextgen.php:25
-msgid "FileHub - Genel Bakış"
+msgid "Aktarım durumu kaydedilemedi."
 msgstr ""
 
-#: gnn-filehub-nextgen.php:37
-msgid "Genel Bakış"
+msgid "Aktarım kaydı yazılamadı."
 msgstr ""
 
-#: gnn-filehub-nextgen.php:45
-msgid "FileHub - Ayarlar"
+msgid "Aktif Depolama Sürücü Seçimi"
 msgstr ""
 
-#: gnn-filehub-nextgen.php:46
+msgid "Alan çok uzun."
+msgstr ""
+
+msgid "Antivirüs Taraması"
+msgstr ""
+
+msgid "Antivirüs bağlantısı geçersiz."
+msgstr ""
+
+msgid "Antivirüs dosyada zararlı içerik tespit etti."
+msgstr ""
+
+msgid "Antivirüs hizmetine erişilemiyor; dosya yayımlanmadı."
+msgstr ""
+
+msgid "Antivirüs taraması tamamlanamadı; dosya yayımlanmadı."
+msgstr ""
+
+msgid "Attachment veritabanına kaydedilemedi."
+msgstr ""
+
 msgid "Ayarlar"
 msgstr ""
 
-#: inc/class-filehub-admin.php:120
-msgid "Genel Ayarlar"
+msgid "Ayarlar başarıyla içe aktarıldı. %d ayar güncellendi."
 msgstr ""
 
-#: inc/class-filehub-admin.php:127
-msgid "Misafir Dosya Yükleme İzni"
+msgid "Ayarları Dışa Aktar"
 msgstr ""
 
-#: inc/class-filehub-admin.php:135
-msgid "Katı MIME Tipi Doğrulaması"
+msgid "Ayarları Dışa Aktar (JSON)"
 msgstr ""
 
-#: inc/class-filehub-admin.php:143
-msgid "Çakışmada Otomatik İsim Değiştirme"
+msgid "Ayarları İçe Aktar"
 msgstr ""
 
-#: inc/class-filehub-admin.php:151
-msgid "İzin Verilen Uzantılar"
+msgid "Aynı parça farklı içerikle gönderildi."
 msgstr ""
 
-#: inc/class-filehub-admin.php:160
-msgid "Varsayılan Depolama Sürücüsü"
+msgid "Açık olduğunda, her başarılı dosya yüklemesinde aşağıdaki adrese bilgilendirme e-postası gönderilir."
 msgstr ""
 
-#: inc/class-filehub-admin.php:272
-msgid "Otomatik Sayfa Atamaları"
+msgid "Aşağıdaki WordPress sayfalarını seçtiğinizde, kısa kodlar (shortcode) ilgili sayfalara otomatik olarak gömülür. Manuel kısa kod yazmak zorunda kalmazsınız."
 msgstr ""
 
-#: inc/class-filehub-admin.php:279
-msgid "Kayıt Ol Sayfası [filehub_register]"
+msgid "Bakım"
 msgstr ""
 
-#: inc/class-filehub-admin.php:293
-msgid "Giriş Yap Sayfası [filehub_login]"
+msgid "Bazı dosyalar yüklenemedi."
 msgstr ""
 
-#: inc/class-filehub-admin.php:307
-msgid "Profil Sayfası [filehub_profile]"
+msgid "Bazı eski dosyalar özel depolamaya taşınamadı. Özel dizin izinlerini ve eski dosyaları kontrol edin."
 msgstr ""
 
-#: inc/class-filehub-admin.php:321
-msgid "Şifre Değiştirme Sayfası [filehub_password_change]"
+msgid "Bağlanmadan önce yukarıdan Client ID ve Client Secret'ı kaydedin."
 msgstr ""
 
-#: inc/class-filehub-admin.php:335
-msgid "Dosya Yükleme Sayfası [filehub_uploader]"
+msgid "Bağlantı başarısız: %s"
 msgstr ""
 
-#: inc/class-filehub-admin.php:349
-msgid "Dosya Yöneticisi Sayfası [filehub_manager]"
+msgid "Bağlantı hatası; yeniden deneyin."
 msgstr ""
 
-#: inc/class-filehub-admin.php:470
-msgid "Özel Depolama Kotası (MB)"
+msgid "Beni Hatırla"
 msgstr ""
 
-#: inc/class-filehub-rest-api.php:90
-msgid "Dosya bulunamadı."
+msgid "Bildirim E-posta Adresi"
 msgstr ""
 
-#: inc/class-filehub-rest-api.php:100
+msgid "Bilgiler güncellendi."
+msgstr ""
+
+msgid "Bilgileri Güncelle"
+msgstr ""
+
+msgid "Bilgileriniz başarıyla güncellendi."
+msgstr ""
+
+msgid "Bir kullanıcı için özel kota tanımlanmadıysa geçerli olan genel depolama sınırı. 0 = sınırsız."
+msgstr ""
+
+msgid "Boyut"
+msgstr ""
+
+msgid "Boş bırakılırsa sitenin yönetici e-posta adresi (Ayarlar → Genel) kullanılır."
+msgstr ""
+
+msgid "Bu bilgilerle kayıt oluşturulamıyor."
+msgstr ""
+
 msgid "Bu dosya uzantısına izin verilmiyor."
 msgstr ""
 
-#: inc/class-filehub-rest-api.php:166
-msgid "Depolama kotanızı aştınız."
+msgid "Bu e-posta %s tarafından GNN Filehub eklentisi üzerinden otomatik olarak gönderilmiştir."
 msgstr ""
 
-#: inc/class-filehub-rest-api.php:218
-msgid "Tüm parçalar birleştirildi, yükleme başarılı!"
+msgid "Bu işlem için giriş yapmalısınız."
+msgstr ""
+
+msgid "Bu işlem için yetkiniz yok."
+msgstr ""
+
+msgid "Bu sayfayı görüntüleme yetkiniz yok."
+msgstr ""
+
+msgid "Bu sayfayı görüntülemek için lütfen giriş yapın."
+msgstr ""
+
+msgid "Bulut dosyası doğrulanamadı."
+msgstr ""
+
+msgid "Bulut dosyası indirilemedi."
+msgstr ""
+
+msgid "Bulut dosyası silinemedi; rezervasyon korundu."
+msgstr ""
+
+msgid "Bulut oturumu temizlenemedi."
+msgstr ""
+
+msgid "Check Updates"
+msgstr ""
+
+msgid "Client ID / Secret / Klasör ID Kaydet"
+msgstr ""
+
+msgid "Cloudflare R2 ayarları geçersiz."
+msgstr ""
+
+msgid "Daha önce dışa aktardığınız bir JSON dosyasını yükleyerek eski ayarlarınızı geri yükleyin. Yalnızca GNN Filehub'a ait bilinen ayarlar okunur; dosyadaki başka hiçbir veri işlenmez."
+msgstr ""
+
+msgid "Depolama Ayarlarını Kaydet"
+msgstr ""
+
+msgid "Depolama Kotası ve Kullanım"
+msgstr ""
+
+msgid "Depolama Sürücüleri"
+msgstr ""
+
+msgid "Depolama Sürücüsü"
+msgstr ""
+
+msgid "Depolama anahtarı çakıştı."
+msgstr ""
+
+msgid "Depolama ayarları değişti; yüklemeyi iptal edip yeniden başlatın."
+msgstr ""
+
+msgid "Depolama kotanız yetersiz."
+msgstr ""
+
+msgid "Depolama oluşturulamadı."
+msgstr ""
+
+msgid "Depolama sürücüsü yapılandırdıysanız bu dosya Cloudflare R2 / Google Drive API anahtarlarınızı düz metin olarak içerir. Güvenli bir yerde saklayın ve kimseyle paylaşmayın."
+msgstr ""
+
+msgid "Devam etmek için aynı dosyayı yeniden seçin."
+msgstr ""
+
+msgid "Donate"
+msgstr ""
+
+msgid "Dosya"
+msgstr ""
+
+msgid "Dosya Başına Yükleme Limiti (MB)"
+msgstr ""
+
+msgid "Dosya Boyutu"
+msgstr ""
+
+msgid "Dosya Gönder"
+msgstr ""
+
+msgid "Dosya Yükle"
+msgstr ""
+
+msgid "Dosya Yükleme Sayfası [filehub_uploader]"
+msgstr ""
+
+msgid "Dosya adı"
+msgstr ""
+
+msgid "Dosya adı ve boyutu gereklidir."
+msgstr ""
+
+msgid "Dosya ara..."
+msgstr ""
+
+msgid "Dosya boyutu doğrulanamadı."
+msgstr ""
+
+msgid "Dosya bulunamadı."
+msgstr ""
+
+msgid "Dosya depolamadan silinemedi; WordPress kaydı korundu."
+msgstr ""
+
+msgid "Dosya geçerli bir GNN Filehub ayar dosyası değil."
+msgstr ""
+
+msgid "Dosya geçişi tamamlanamadı."
+msgstr ""
+
+msgid "Dosya içerik taraması tarafından reddedildi."
+msgstr ""
+
+msgid "Dosya içeriği uzantısıyla eşleşmiyor."
+msgstr ""
+
+msgid "Dosya işleniyor; sayfayı açık tutun."
+msgstr ""
+
+msgid "Dosya kaydedilemedi."
+msgstr ""
+
+msgid "Dosya metaverisi kaydedilemedi."
+msgstr ""
+
+msgid "Dosya okunamadı."
+msgstr ""
+
+msgid "Dosya parçası gereklidir."
+msgstr ""
+
+msgid "Dosya seç"
+msgstr ""
+
+msgid "Dosya silinemedi."
+msgstr ""
+
+msgid "Dosya silinemedi; kayıt korundu."
+msgstr ""
+
+msgid "Dosya tamamlanma kaydı yazılamadı."
+msgstr ""
+
+msgid "Dosya veya yükleyen ara..."
+msgstr ""
+
+msgid "Dosya yükleme sınırını aşıyor."
+msgstr ""
+
+msgid "Dosya yükleyebilmek için PHP Fileinfo etkinleştirilmelidir."
+msgstr ""
+
+msgid "Dosya çok büyük."
+msgstr ""
+
+msgid "Dosyalar sunucuda içerik kontrolünden geçtikten sonra sınırlı parçalarla R2'ye aktarılır. Tarayıcı için bucket CORS ayarı gerekmez."
+msgstr ""
+
+msgid "Dosyaları buraya sürükleyin"
+msgstr ""
+
+msgid "Dosyalarım"
+msgstr ""
+
+msgid "Dosyalarım Sayfası [filehub_manager]"
+msgstr ""
+
+msgid "Dosyalarınızı görüntülemek için lütfen giriş yapın."
+msgstr ""
+
+msgid "Dosyanın bütün parçaları henüz alınmadı."
+msgstr ""
+
+msgid "Doğrudan yükleme kaldırıldı; güvenli yükleme oturumu kullanın."
+msgstr ""
+
+msgid "Doğrulama bağlantısı geçersiz veya süresi dolmuş."
+msgstr ""
+
+msgid "Doğrulama e-postası gönderilemedi; daha sonra yeniden deneyin."
+msgstr ""
+
+msgid "E-posta Adresi *"
+msgstr ""
+
+msgid "E-posta adresinizi doğrulayın"
+msgstr ""
+
+msgid "E-posta doğrulandı. Hesap sayfasından giriş yapabilirsiniz."
+msgstr ""
+
+msgid "Eksik Sayfaları Otomatik Oluştur"
+msgstr ""
+
+msgid "Eksik veya atanmamış sayfaları tek tıkla otomatik olarak oluşturur ve ilgili kısa kodları atar."
+msgstr ""
+
+msgid "En fazla iki indirme aynı anda işlenebilir."
+msgstr ""
+
+msgid "En fazla üç açık yükleme olabilir; eski yüklemeyi iptal edin."
+msgstr ""
+
+msgid "Eski depolama ayarları geri yüklenmeden bulut oturumu temizlenemez."
+msgstr ""
+
+msgid "Eski herkese açık dosya kaldırılamadı."
+msgstr ""
+
+msgid "Eski yerel dosya bulunamadı."
+msgstr ""
+
+msgid "Etkinleştirmek için sunucuda ClamAV çalışmalıdır. Hizmet erişilemezse veya tarama başarısızsa dosya yayımlanmaz. Büyük dosyalar için ClamAV boyut sınırını yapılandırın."
+msgstr ""
+
+msgid "Finfo ile içerik doğrulaması her yüklemede zorunludur. Bu bir virüs taraması değildir."
+msgstr ""
+
+msgid "GNN Filehub - Ayarlar"
+msgstr ""
+
+msgid "GNN Filehub - Genel Bakış"
+msgstr ""
+
+msgid "GNN Filehub - Tüm Dosyalar"
+msgstr ""
+
+msgid "GNN Filehub — Depolama Durumu"
+msgstr ""
+
+msgid "Genel & Güvenlik"
+msgstr ""
+
+msgid "Genel & Güvenlik Yapılandırması"
+msgstr ""
+
+msgid "Genel & güvenlik ayarlarınızı, sayfa atamalarınızı ve depolama sürücü yapılandırmanızı tek bir JSON dosyası olarak indirin. Eklentiyi yeniden kurduğunuzda bu dosyayı içe aktararak kaldığınız yerden devam edebilirsiniz."
+msgstr ""
+
+msgid "Genel Ayarları Kaydet"
+msgstr ""
+
+msgid "Genel Bakış"
+msgstr ""
+
+msgid "Gerçek kota alınamadı; yalnızca FileHub tarafından izlenen kullanım gösteriliyor."
+msgstr ""
+
+msgid "Geçerli bir JSON nesnesi gönderin."
+msgstr ""
+
+msgid "Geçerli kullanıcı adı, e-posta ve en az 12 karakterlik eşleşen şifreler gereklidir."
+msgstr ""
+
+msgid "Geçersiz Google aktarım adresi."
+msgstr ""
+
+msgid "Geçersiz Google aktarım ilerlemesi."
+msgstr ""
+
+msgid "Geçersiz Office belgesi."
+msgstr ""
+
+msgid "Geçersiz alan türü veya uzunluğu."
+msgstr ""
+
+msgid "Geçersiz arama."
+msgstr ""
+
+msgid "Geçersiz ayar türü."
+msgstr ""
+
+msgid "Geçersiz depolama anahtarı."
+msgstr ""
+
+msgid "Geçersiz depolama sürücüsü."
+msgstr ""
+
+msgid "Geçersiz dosya adı."
+msgstr ""
+
+msgid "Geçersiz dosya boyutu."
+msgstr ""
+
+msgid "Geçersiz doğrulama bağlantısı."
+msgstr ""
+
+msgid "Geçersiz parça indeksi."
+msgstr ""
+
+msgid "Geçersiz parça yüklemesi."
+msgstr ""
+
+msgid "Geçersiz parça."
+msgstr ""
+
+msgid "Geçersiz sayfa bilgisi."
+msgstr ""
+
+msgid "Geçersiz sürücü."
+msgstr ""
+
+msgid "Geçersiz yükleme kaynağı."
+msgstr ""
+
+msgid "Geçersiz yükleme oturumu."
+msgstr ""
+
+msgid "Geçici depolama kapasitesi yetersiz."
+msgstr ""
+
+msgid "Geçici dosya bulunamadı."
+msgstr ""
+
+msgid "Geçici dosya eksik."
+msgstr ""
+
+msgid "Geçici dosya okunamadı."
+msgstr ""
+
+msgid "Geçici dosya silinemedi."
+msgstr ""
+
+msgid "Geçici klasör oluşturulamadı."
+msgstr ""
+
+msgid "Geçiş bütünlüğü doğrulanamadı."
+msgstr ""
+
+msgid "Giriş Yap"
+msgstr ""
+
+msgid "Girişten önce e-posta adresinizi doğrulayın."
+msgstr ""
+
+msgid "Gizle"
+msgstr ""
+
+msgid "Google Bağlantısı"
+msgstr ""
+
+msgid "Google Cloud Console'daki OAuth istemcinizin \"Authorized redirect URIs\" listesine şu adresi ekleyin:"
+msgstr ""
+
+msgid "Google Drive API bilgileri eksik."
+msgstr ""
+
+msgid "Google Drive hesabınız bağlı."
+msgstr ""
+
+msgid "Google Drive hesabınız başarıyla bağlandı."
+msgstr ""
+
+msgid "Google Drive hesabınızda sınırsız depolama planı var."
+msgstr ""
+
+msgid "Google Drive hesabınızın gerçek kotası (yalnızca bu eklentiyle yüklenenler değil)."
+msgstr ""
+
+msgid "Google Drive kimlik doğrulaması başarısız."
+msgstr ""
+
+msgid "Google Drive kota bilgisi alınamadı: %s"
+msgstr ""
+
+msgid "Google aktarımı başlatılamadı."
+msgstr ""
+
+msgid "Google aktarımı iptal edilemedi."
+msgstr ""
+
+msgid "Google dosya kaydı doğrulanamadı."
+msgstr ""
+
+msgid "Google dosyası bulunamadı."
+msgstr ""
+
+msgid "Google dosyası indirilemedi."
+msgstr ""
+
+msgid "Google dosyası silinemedi."
+msgstr ""
+
+msgid "Google ile Bağlan"
+msgstr ""
+
+msgid "Google klasör sorgusu başarısız."
+msgstr ""
+
+msgid "Google oturumu doğrulanamadı; yeniden deneyin veya iptal edin."
+msgstr ""
+
+msgid "Google parça boyutu doğrulanamadı."
+msgstr ""
+
+msgid "Google parçası kaydedilemedi; yeniden denenebilir."
+msgstr ""
+
+msgid "Google'a bağlanılamadı, lütfen tekrar deneyin."
+msgstr ""
+
+msgid "Görünen Ad"
+msgstr ""
+
+msgid "Görünen ad boş bırakılamaz."
+msgstr ""
+
+msgid "Görünen dosya adı çakışırsa _1, _2 eki eklenir. Depolama anahtarı her zaman benzersizdir."
+msgstr ""
+
+msgid "Göster"
+msgstr ""
+
+msgid "Güncel yükleme veya kota sınırı aşılıyor."
+msgstr ""
+
+msgid "Güncelleme paketi geçerli bir FileHub paketi değil."
+msgstr ""
+
+msgid "Güncellenecek bir bilgi gönderilmedi."
+msgstr ""
+
+msgid "Güncelleniyor…"
+msgstr ""
+
+msgid "Güvenli yükleme oturumu gereklidir."
+msgstr ""
+
+msgid "Güvenlik doğrulaması başarısız (state)."
+msgstr ""
+
+msgid "Güvenlik doğrulaması başarısız."
+msgstr ""
+
+msgid "Güvenlik doğrulaması başarısız; sayfayı yenileyin."
+msgstr ""
+
+msgid "Henüz bağlı değil."
+msgstr ""
+
+msgid "Hesabım"
+msgstr ""
+
+msgid "Hesabınızı etkinleştirmek için bu bağlantıyı 24 saat içinde açın: %s"
+msgstr ""
+
+msgid "Hesap Bilgileri"
+msgstr ""
+
+msgid "Hesap Sayfası (Giriş / Kayıt / Profil) [filehub_account]"
+msgstr ""
+
+msgid "Hoş Geldiniz, %s"
+msgstr ""
+
+msgid "Hızlı Kurulum"
+msgstr ""
+
+msgid "Kapalı"
+msgstr ""
+
+msgid "Kapat"
+msgstr ""
+
+msgid "Katı MIME Doğrulaması"
+msgstr ""
+
+msgid "Kaydınız alındı. E-postanızdaki doğrulama bağlantısını açtıktan sonra giriş yapabilirsiniz."
+msgstr ""
+
+msgid "Kayıt Ol"
+msgstr ""
+
+msgid "Kayıt işlemi yapılıyor…"
+msgstr ""
+
+msgid "Kullanıcı"
+msgstr ""
+
+msgid "Kullanıcı Adı *"
+msgstr ""
+
+msgid "Kullanıcı Adı veya E-posta"
+msgstr ""
+
+msgid "Kullanıcı Adı: %1$s · Kullanıcı ID: %2$s"
+msgstr ""
+
+msgid "Kullanıcı Depolama Analizi"
+msgstr ""
+
+msgid "Kullanıcı Girişi"
+msgstr ""
+
+msgid "Kullanıcı ID"
+msgstr ""
+
+msgid "Kullanıcı Rolü"
+msgstr ""
+
+msgid "Kullanıcı klasörü oluşturulamadı: %s"
+msgstr ""
+
+msgid "Kullanım / Kota"
+msgstr ""
+
+msgid "Lütfen geçerli bir .json dosyası yükleyin."
+msgstr ""
+
+msgid "Mevcut Şifre"
+msgstr ""
+
+msgid "Mevcut şifreniz yanlış."
+msgstr ""
+
+msgid "Misafir"
+msgstr ""
+
+msgid "Misafir Yükleme İzni"
+msgstr ""
+
+msgid "Misafirler ortak misafir kotasını kullanır; dosyalarını yalnızca yöneticiler indirebilir."
+msgstr ""
+
+msgid "Office belgeleri için PHP Zip etkinleştirilmelidir."
+msgstr ""
+
+msgid "Office belgelerini doğrulamak için PHP Zip etkinleştirilmelidir."
+msgstr ""
+
+msgid "Onayla?"
+msgstr ""
+
+msgid "Otomatik Sayfa Atamaları"
+msgstr ""
+
+msgid "Otomatik İsim Çakışma Önleme"
+msgstr ""
+
+msgid "Oturum değişti; sayfa yenileniyor."
+msgstr ""
+
+msgid "Oturum silinemedi."
+msgstr ""
+
+msgid "Parça boyutu hatalı."
+msgstr ""
+
+msgid "Parça kaydı yazılamadı."
+msgstr ""
+
+msgid "Parça yazılamadı."
+msgstr ""
+
+msgid "Profilinize ve depolama kotanıza dönün"
+msgstr ""
+
+msgid "Profilinizi görüntülemek için lütfen giriş yapın."
+msgstr ""
+
+msgid "R2 aktarımı başlatılamadı."
+msgstr ""
+
+msgid "R2 dosyası silinemedi."
+msgstr ""
+
+msgid "R2 oturumu iptal edilemedi."
+msgstr ""
+
+msgid "R2 parçası kaydedilemedi; yeniden denenebilir."
+msgstr ""
+
+msgid "R2 tamamlanması doğrulanamadı."
+msgstr ""
+
+msgid "Sadece yöneticilerin erişebildiği, tüm üyelerin yüklediği dosyaları listeleyen sayfa."
+msgstr ""
+
+msgid "Sayfa Atamalarını Kaydet"
+msgstr ""
+
+msgid "Settings"
+msgstr ""
+
+msgid "Sil"
+msgstr ""
+
+msgid "Siteye yeni üye kaydı kapalıdır."
+msgstr ""
+
+msgid "Siteye yeni üye kaydı şu an kapalıdır."
+msgstr ""
+
+msgid "Son Yüklenen Dosyalar"
+msgstr ""
+
+msgid "Sonraki"
+msgstr ""
+
+msgid "Soyadı"
+msgstr ""
+
+msgid "Sunucu diskindeki gerçek boş alana göre."
+msgstr ""
+
+msgid "Sunucuda PHP Fileinfo etkinleştirilmelidir."
+msgstr ""
+
+msgid "Süresi dolmuş bulut oturumları temizlenemedi; depolama ayarlarını kontrol edin."
+msgstr ""
+
+msgid "Sürücü"
+msgstr ""
+
+msgid "Sınırsız"
+msgstr ""
+
+msgid "Sınırsız kota"
+msgstr ""
+
+msgid "Tamamlanma kaydı yazılamadı."
+msgstr ""
+
+msgid "Tamamlanma kaydı yazılamadı; yeniden deneyin."
+msgstr ""
+
+msgid "Tek bir dosya için izin verilen maksimum boyut. 0 = sınırsız."
+msgstr ""
+
+msgid "Tek sayfa: oturum kapalıysa giriş/kayıt sekmeleri, oturum açıksa profil ve şifre güncelleme gösterilir. Nav menüde bu sayfaya eklenen bağlantı, oturum durumuna göre otomatik olarak \"Giriş Yap\" veya \"Profil\" yazısına döner."
+msgstr ""
+
+msgid "Toplam Disk Alanı"
+msgstr ""
+
+msgid "Toplam Dosya Sayısı"
+msgstr ""
+
+msgid "Toplam dosya: %1$d · Tamamlanan indirme: %2$d"
+msgstr ""
+
+msgid "Tüm Dosyalar"
+msgstr ""
+
+msgid "Tüm Dosyalar Sayfası (Admin) [filehub_admin_files]"
+msgstr ""
+
+msgid "Tüm Dosyaları Görüntüle"
+msgstr ""
+
+msgid "Tüm dosyaları görüntüle →"
+msgstr ""
+
+msgid "Tüm sayfalar zaten atanmış, yeni sayfa oluşturulmadı."
+msgstr ""
+
+msgid "Tüm Üye Dosyaları"
+msgstr ""
+
+msgid "Tüm üyelerin dosyalarını görüntüleyin ve yönetin"
+msgstr ""
+
+msgid "Uyarı:"
+msgstr ""
+
+msgid "Varsayılan Depolama Kotası (MB)"
+msgstr ""
+
+msgid "Virgülle ayrılmış dosya uzantıları listesi."
+msgstr ""
+
+msgid "Web kökü doğrulanamadı; GNN_FILEHUB_PRIVATE_DIR yapılandırılmalıdır."
+msgstr ""
+
+msgid "Web kökü dışında özel depolama oluşturulamadı. GNN_FILEHUB_PRIVATE_DIR yapılandırılmalı."
+msgstr ""
+
+msgid "Yalnızca FileHub tarafından izlenen kullanım; bucket kapasitesi değildir."
+msgstr ""
+
+msgid "Yarım multipart aktarımlar için bucket yaşam döngüsü temizliğini etkin tutun."
+msgstr ""
+
+msgid "Yeni Dosya Yüklendi"
+msgstr ""
+
+msgid "Yeni Hesap Oluştur"
+msgstr ""
+
+msgid "Yeni bir dosya yükleyin"
+msgstr ""
+
+msgid "Yeni Şifre"
+msgstr ""
+
+msgid "Yeni Şifre (Tekrar)"
+msgstr ""
+
+msgid "Yeni şifreler birbiriyle eşleşmiyor."
+msgstr ""
+
+msgid "Yeniden Bağlan"
+msgstr ""
+
+msgid "Yeniden dene"
+msgstr ""
+
+msgid "Yüklediğim Dosyalar"
+msgstr ""
+
+msgid "Yüklediğiniz dosyaları görüntüleyin ve yönetin"
+msgstr ""
+
+msgid "Yükleme Bildirim E-postası"
+msgstr ""
+
+msgid "Yükleme Zamanı"
+msgstr ""
+
+msgid "Yükleme artık parça kabul etmiyor."
+msgstr ""
+
+msgid "Yükleme bulunamadı."
+msgstr ""
+
+msgid "Yükleme iptal edildi."
+msgstr ""
+
+msgid "Yükleme kaydedilemedi."
+msgstr ""
+
+msgid "Yükleme kimliği çakıştı."
+msgstr ""
+
+msgid "Yükleme oturumu kaydedilemedi."
+msgstr ""
+
+msgid "Yükleme oturumunun süresi doldu."
+msgstr ""
+
+msgid "Yükleme tamamlandı."
+msgstr ""
+
+msgid "Yükleme yapmak için giriş yapmalısınız."
+msgstr ""
+
+msgid "Yükleme yöntemi güncellendi; sayfayı yenileyin."
+msgstr ""
+
+msgid "Yüklemeyi iptal et"
+msgstr ""
+
+msgid "Yüklenen Dosya"
+msgstr ""
+
+msgid "Yükleniyor"
+msgstr ""
+
+msgid "Yükleniyor..."
+msgstr ""
+
+msgid "Yükleniyor…"
+msgstr ""
+
+msgid "Zaten giriş yapmış durumdasınız."
+msgstr ""
+
+msgid "Zorunlu MIME doğrulaması"
+msgstr ""
+
+msgid "[%1$s] Yeni Dosya Yüklendi: %2$s"
+msgstr ""
+
+msgid "veya bilgisayarınızdan seçmek için tıklayın"
+msgstr ""
+
+msgid "Çok fazla istek; daha sonra yeniden deneyin."
+msgstr ""
+
+msgid "Çıkış Yap"
+msgstr ""
+
+msgid "Önce Client ID ve Client Secret alanlarını doldurup kaydedin."
+msgstr ""
+
+msgid "Önce e-posta adresinizi doğrulayın."
+msgstr ""
+
+msgid "Önce mevcut yüklemenin bitmesini bekleyin."
+msgstr ""
+
+msgid "Önceki"
+msgstr ""
+
+msgid "Önizle"
+msgstr ""
+
+msgid "Önizleme yalnızca 8 MB altındaki resim ve PDF dosyaları için kullanılabilir."
+msgstr ""
+
+msgid "Özel depolama bulunamadı."
+msgstr ""
+
+msgid "Özel depolama web kökü içinde olamaz."
+msgstr ""
+
+msgid "Özel depolama yazılabilir değil."
+msgstr ""
+
+msgid "Özel depolama yolu geçersiz."
+msgstr ""
+
+msgid "Özel depolamaya geçiş yapılamadı."
+msgstr ""
+
+msgid "Özel depolamaya yazılamadı."
+msgstr ""
+
+msgid "Üyeler bu sayfada yalnızca kendi yükledikleri dosyaları görür ve silebilir."
+msgstr ""
+
+msgid "İndir"
+msgstr ""
+
+msgid "İndirme"
+msgstr ""
+
+msgid "İndirme için geçici alan yetersiz."
+msgstr ""
+
+msgid "İndirme rezervasyonu oluşturulamadı."
+msgstr ""
+
+msgid "İptal"
+msgstr ""
+
+msgid "İstek sınırı kaydedilemedi; yeniden deneyin."
+msgstr ""
+
+msgid "İzin Verilen Uzantı Listesi"
+msgstr ""
+
+msgid "İzin verilmedi, bağlantı iptal edildi."
+msgstr ""
+
+msgid "İçe aktarma başarısız oldu."
+msgstr ""
+
+msgid "İşlem"
+msgstr ""
+
+msgid "İşlem başarısız."
+msgstr ""
+
+msgid "İşlem sürüyor; lütfen yeniden deneyin."
+msgstr ""
+
+msgid "Şifre"
+msgstr ""
+
+msgid "Şifre (Tekrar) *"
+msgstr ""
+
+msgid "Şifre *"
+msgstr ""
+
+msgid "Şifre Güncelle"
+msgstr ""
+
+msgid "Şifre en az 12 karakter olmalıdır."
+msgstr ""
+
+msgid "Şifreniz başarıyla güncellendi."
+msgstr ""
+
+msgid "Şifrenizi değiştirmek için lütfen giriş yapın."
+msgstr ""
+
+msgid "Şifrenizi değiştirmek için tüm şifre alanlarını doldurun."
 msgstr ""

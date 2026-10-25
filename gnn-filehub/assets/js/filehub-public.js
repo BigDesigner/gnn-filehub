@@ -114,680 +114,260 @@
 })();
 
 document.addEventListener('DOMContentLoaded', function () {
-  const dropZone = document.getElementById('filehub-dropzone');
-  const fileInput = document.getElementById('filehub-file-input');
-  const progressBar = document.getElementById('filehub-progress-bar');
-  const progressFill = document.getElementById('filehub-progress-fill');
-  const statusText = document.getElementById('filehub-status-text');
-  const displayNameForm = document.getElementById('filehub-displayname-form');
-  const displayNameStatus = document.getElementById('filehub-displayname-status');
-  const passwordForm = document.getElementById('filehub-password-form');
-  const passwordStatus = document.getElementById('filehub-password-status');
-  const registerForm = document.getElementById('filehub-register-form');
-  const registerStatus = document.getElementById('filehub-register-status');
+  'use strict';
+  if (!window.filehub_vars) return;
+  const config = window.filehub_vars;
+  const t = key => config.strings[key] || key;
+  const base = new URL(config.api_url);
+  function endpoint(path) {
+    const url = new URL(base.href);
+    const split = path.indexOf('?');
+    const route = split < 0 ? path : path.slice(0, split);
+    if (url.searchParams.has('rest_route')) url.searchParams.set('rest_route', url.searchParams.get('rest_route').replace(/\/?$/, '/') + route);
+    else url.pathname = base.pathname.replace(/\/?$/, '/') + route;
+    if (split >= 0) new URLSearchParams(path.slice(split + 1)).forEach((value, key) => url.searchParams.set(key, value));
+    return url;
+  }
+  const node = (tag, text, cls) => {
+    const el = document.createElement(tag);
+    if (text !== undefined) el.textContent = String(text);
+    if (cls) el.className = cls;
+    return el;
+  };
+  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+  async function api(path, options = {}, token = '', attempts = 3) {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const headers = { 'X-WP-Nonce': config.nonce, ...options.headers };
+        if (token) headers['X-FileHub-Token'] = token;
+        const response = await fetch(endpoint(path), { credentials: 'same-origin', ...options, headers });
+        const data = await response.json();
+        if (!response.ok || data.success === false) {
+          const error = new Error(data.message || data.error || t('error'));
+          error.status = response.status;
+          throw error;
+        }
+        return { data, response };
+      } catch (error) {
+        if (error.name === 'AbortError' || attempt >= attempts || (error.status && ![409,429,500,502,503,504].includes(error.status))) throw error;
+        await sleep(Math.min(8000, 500 * Math.pow(2, attempt)));
+      }
+    }
+  }
+  const json = data => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
 
-  // Cache of the last fetched (unfiltered) rows per file-list container, for live search.
-  const fileListCache = new WeakMap();
-
-  // Add a show/hide toggle to every password field inside FileHub forms — covers the
-  // native wp_login_form() password input as well as our own register/password-change fields.
-  document.querySelectorAll('.filehub-container input[type="password"]').forEach(function (input) {
-    const wrapper = document.createElement('div');
-    wrapper.className = 'filehub-password-wrap';
-    input.parentNode.insertBefore(wrapper, input);
-    wrapper.appendChild(input);
-
-    const toggle = document.createElement('button');
-    toggle.type = 'button';
-    toggle.className = 'filehub-password-toggle';
-    toggle.setAttribute('aria-label', 'Şifreyi göster/gizle');
-    toggle.textContent = '👁';
-    wrapper.appendChild(toggle);
-
-    toggle.addEventListener('click', function () {
-      const showing = input.type === 'text';
-      input.type = showing ? 'password' : 'text';
-      toggle.textContent = showing ? '👁' : '🙈';
+  document.querySelectorAll('.filehub-container input[type="password"]').forEach(input => {
+    const button = node('button', t('show'), 'filehub-password-toggle');
+    button.type = 'button'; button.setAttribute('aria-label', t('show'));
+    input.insertAdjacentElement('afterend', button);
+    button.addEventListener('click', () => {
+      const visible = input.type === 'password'; input.type = visible ? 'text' : 'password';
+      button.textContent = t(visible ? 'hide' : 'show'); button.setAttribute('aria-pressed', String(visible));
     });
   });
 
-  // Drag & Drop File Upload
-  if (dropZone && fileInput) {
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-      dropZone.addEventListener(eventName, preventDefaults, false);
-    });
-
-    function preventDefaults(e) {
-      e.preventDefault();
-      e.stopPropagation();
+  const drop = document.getElementById('filehub-dropzone');
+  const input = document.getElementById('filehub-file-input');
+  const status = document.getElementById('filehub-status-text');
+  const bar = document.getElementById('filehub-progress-bar');
+  const fill = document.getElementById('filehub-progress-fill');
+  const cancel = document.getElementById('filehub-upload-cancel');
+  let active = false, cancelled = false, controller = null, session = null, currentFile = null;
+  const queue = [];
+  function progress(percent, message) {
+    if (bar) { bar.style.display = 'block'; bar.setAttribute('role', 'progressbar'); bar.setAttribute('aria-valuemin', '0'); bar.setAttribute('aria-valuemax', '100'); bar.setAttribute('aria-valuenow', String(percent)); bar.setAttribute('aria-label', t('uploading')); }
+    if (fill) fill.style.width = percent + '%';
+    if (status) status.textContent = message;
+  }
+  function storageKey(file) { return 'filehub:' + base.href + ':' + config.user_id + ':' + file.name + ':' + file.size + ':' + file.lastModified; }
+  function stored(file) { try { return JSON.parse(sessionStorage.getItem(storageKey(file))); } catch (_) { return null; } }
+  function remember(file, data) { try { sessionStorage.setItem(storageKey(file), JSON.stringify(data)); } catch (_) {} }
+  function forget(file) { try { sessionStorage.removeItem(storageKey(file)); } catch (_) {} }
+  async function upload(file) {
+    const saved = stored(file); let state;
+    session = null;
+    if (saved && /^[a-f0-9-]{36}$/.test(saved.id) && /^[a-f0-9]{64}$/.test(saved.token)) {
+      session = saved;
+      try { state = (await api('uploads/' + saved.id, { signal: controller.signal }, saved.token)).data; }
+      catch (error) { if (![404,410].includes(error.status)) throw error; session = null; forget(file); }
     }
-
-    ['dragenter', 'dragover'].forEach(eventName => {
-      dropZone.addEventListener(eventName, function () {
-        dropZone.classList.add('filehub-highlight');
-      });
-    });
-
-    ['dragleave', 'drop'].forEach(eventName => {
-      dropZone.addEventListener(eventName, function () {
-        dropZone.classList.remove('filehub-highlight');
-      });
-    });
-
-    dropZone.addEventListener('drop', handleDrop, false);
-
-    // The whole dropzone is clickable — no separate "Dosya Seç" button needed (and having a
-    // <button> nested inside meant its own styling never actually applied on the front end).
-    dropZone.addEventListener('click', function () {
-      fileInput.click();
-    });
-
-    fileInput.addEventListener('change', function () {
-      if (this.files.length > 0) {
-        uploadFileQueue(this.files);
-      }
-    });
-
-    function handleDrop(e) {
-      const dt = e.dataTransfer;
-      const files = dt.files;
-      if (files.length > 0) {
-        uploadFileQueue(files);
-      }
+    if (!session) {
+      const result = await api('uploads', { ...json({ filename: file.name, size: file.size }), signal: controller.signal }, '', 0);
+      state = result.data; session = { id: state.upload_id, token: state.upload_token };
+      remember(file, session);
     }
-
-    const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks — fewer round-trips than 2MB without
-                                         // risking common low upload_max_filesize limits
-    const CHUNK_CONCURRENCY = 3; // upload several chunks at once to hide per-request
-                                  // WordPress bootstrap overhead behind network latency
-
-    // Uploads every selected/dropped file one after another (sequential, not parallel),
-    // so the server and the progress bar only ever deal with one upload at a time.
-    // Each upload path reports back whether it actually succeeded via onSettled(success) —
-    // the final summary reflects real outcomes instead of always claiming success regardless
-    // of what happened.
-    function uploadFileQueue(fileList) {
-      const files = Array.from(fileList);
-      let index = 0;
-      let failCount = 0;
-
-      if (progressBar) progressBar.style.display = 'block';
-
-      function finish() {
-        const successCount = files.length - failCount;
-
-        if (statusText) {
-          if (files.length === 1) {
-            // Leave whatever specific message the single upload path already set (its own
-            // success line, or the real error) instead of overwriting it with a generic one.
-            if (failCount === 0) {
-              statusText.textContent = 'Yükleme başarıyla tamamlandı!';
-            }
-          } else if (failCount === 0) {
-            statusText.textContent = `${files.length} dosya başarıyla yüklendi!`;
-          } else if (successCount === 0) {
-            statusText.textContent = `${files.length} dosyanın hiçbiri yüklenemedi.`;
-          } else {
-            statusText.textContent = `${successCount}/${files.length} dosya yüklendi, ${failCount} dosya başarısız oldu.`;
-          }
-        }
-
-        setTimeout(() => {
-          if (progressBar) progressBar.style.display = 'none';
-          refreshAllFileLists();
-        }, 1200);
-      }
-
-      function uploadNext() {
-        if (index >= files.length) {
-          finish();
-          return;
-        }
-
-        const file = files[index];
-        const position = ++index; // 1-based for display
-        const label = files.length > 1 ? `(${position}/${files.length}) ${file.name}: ` : '';
-
-        const onSettled = function ( success ) {
-          if ( false === success ) {
-            failCount++;
-          }
-          uploadNext();
-        };
-
-        if (window.filehub_vars && filehub_vars.active_driver === 'r2') {
-          // Cloudflare R2 is configured: skip our own server entirely and upload straight from
-          // the browser to R2 with a presigned URL — no PHP memory/time limits apply, any file
-          // size behaves the same way (this is how WeTransfer-style uploads actually work).
-          uploadFileR2Direct(file, label, onSettled);
-        } else if (file.size > CHUNK_SIZE) {
-          uploadFileChunked(file, label, onSettled);
+    if (state.status === 'done' && Number.isInteger(state.attachment_id)) { forget(file); return; }
+    const received = new Set(state.received || []);
+    const hashes = state.received_hashes || {};
+    const started = performance.now(); let sent = 0;
+    if (state.status === 'receiving') {
+      for (let index = 0; index < state.total_chunks; index++) {
+        if (cancelled) throw new DOMException(t('cancelled'), 'AbortError');
+        const chunk = file.slice(index * state.chunk_size, Math.min(file.size, (index + 1) * state.chunk_size));
+        // Check resumed content against the server hash; never mix two different files.
+        if (received.has(index) && window.crypto && crypto.subtle && hashes[index]) {
+          const digest = await crypto.subtle.digest('SHA-256', await chunk.arrayBuffer());
+          const hash = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
+          if (hash !== hashes[index]) throw new Error(t('chooseAgain'));
         } else {
-          uploadFileSingle(file, label, onSettled);
+          const form = new FormData(); form.append('chunk', chunk, file.name);
+          await api('uploads/' + session.id + '/chunks/' + index, { method: 'POST', body: form, signal: controller.signal }, session.token);
         }
+        sent += chunk.size;
+        const percent = Math.min(99, Math.round(sent / file.size * 100));
+        const speed = (sent / 1048576 / Math.max(0.1, (performance.now() - started) / 1000)).toFixed(2);
+        progress(percent, file.name + ': ' + t('uploading') + ' ' + percent + '% (' + speed + ' MB/s)');
       }
-
-      uploadNext();
     }
-
-    function uploadFileR2Direct(file, label, onSettled) {
-      if (statusText) statusText.textContent = label + 'Yükleme başlatılıyor...';
-
-      fetch(filehub_vars.rest_url + 'filehub/v1/r2-presign', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-WP-Nonce': filehub_vars.nonce
-        },
-        body: JSON.stringify({ filename: file.name, file_size: file.size })
-      })
-        .then(res => res.json())
-        .then(presignData => {
-          if (!presignData.success) {
-            if (statusText) statusText.textContent = label + 'Hata: ' + (presignData.error || 'Yükleme başlatılamadı.');
-            onSettled(false);
-            return;
-          }
-
-          const xhr = new XMLHttpRequest();
-          const startTime = new Date().getTime();
-
-          xhr.upload.addEventListener('progress', function (e) {
-            if (e.lengthComputable) {
-              const percent = Math.round((e.loaded / e.total) * 100);
-              if (progressFill) progressFill.style.width = percent + '%';
-
-              if (percent >= 100) {
-                // All bytes are with R2 now, but we still have to tell WordPress about it —
-                // don't leave the user staring at a frozen "%100" with no explanation.
-                if (statusText) statusText.textContent = label + 'Dosya işleniyor, lütfen bekleyin...';
-              } else {
-                const elapsedTime = (new Date().getTime() - startTime) / 1000;
-                const speedBytes = elapsedTime > 0 ? e.loaded / elapsedTime : 0;
-                const speedMB = (speedBytes / (1024 * 1024)).toFixed(2);
-                if (statusText) statusText.textContent = `${label}Yükleniyor: %${percent} (${speedMB} MB/s)`;
-              }
-            }
-          });
-
-          xhr.onreadystatechange = function () {
-            if (xhr.readyState === XMLHttpRequest.DONE) {
-              if (xhr.status >= 200 && xhr.status < 300) {
-                if (statusText) statusText.textContent = label + 'Kaydediliyor...';
-
-                fetch(filehub_vars.rest_url + 'filehub/v1/r2-finalize', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'X-WP-Nonce': filehub_vars.nonce
-                  },
-                  body: JSON.stringify({ key: presignData.key, filename: file.name, mime_type: file.type })
-                })
-                  .then(res => res.json())
-                  .then(finalizeData => {
-                    if (finalizeData.success) {
-                      if (statusText) statusText.textContent = label + 'Yükleme başarıyla tamamlandı!';
-                      if (progressFill) progressFill.style.width = '100%';
-                      onSettled(true);
-                    } else {
-                      if (statusText) statusText.textContent = label + 'Hata: ' + (finalizeData.error || 'Kayıt başarısız.');
-                      onSettled(false);
-                    }
-                  })
-                  .catch(() => {
-                    if (statusText) statusText.textContent = label + 'Sunucu bağlantı hatası.';
-                    onSettled(false);
-                  });
-              } else {
-                if (statusText) statusText.textContent = label + 'Hata: Cloudflare R2\'ye yükleme başarısız. Bucket CORS ayarlarını kontrol edin.';
-                onSettled(false);
-              }
-            }
-          };
-
-          xhr.open('PUT', presignData.upload_url, true);
-          xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
-          xhr.send(file);
-        })
-        .catch(() => {
-          if (statusText) statusText.textContent = label + 'Sunucu bağlantı hatası.';
-          onSettled(false);
-        });
-    }
-
-    function uploadFileSingle(file, label, onSettled) {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const xhr = new XMLHttpRequest();
-      const startTime = new Date().getTime();
-
-      if (statusText) statusText.textContent = label + 'Yükleme başlatılıyor...';
-
-      xhr.upload.addEventListener('progress', function (e) {
-        if (e.lengthComputable) {
-          const percent = Math.round((e.loaded / e.total) * 100);
-          if (progressFill) progressFill.style.width = percent + '%';
-
-          if (percent >= 100) {
-            // The bytes are all uploaded, but the server still has to save/relay the file —
-            // don't leave the user staring at a frozen "%100" with no explanation.
-            if (statusText) statusText.textContent = label + 'Dosya işleniyor, lütfen bekleyin...';
-          } else {
-            const elapsedTime = (new Date().getTime() - startTime) / 1000;
-            const speedBytes = elapsedTime > 0 ? e.loaded / elapsedTime : 0;
-            const speedMB = (speedBytes / (1024 * 1024)).toFixed(2);
-            if (statusText) statusText.textContent = `${label}Yükleniyor: %${percent} (${speedMB} MB/s)`;
-          }
-        }
-      });
-
-      xhr.onreadystatechange = function () {
-        if (xhr.readyState === XMLHttpRequest.DONE) {
-          if (xhr.status === 200) {
-            if (statusText) statusText.textContent = label + 'Yükleme başarıyla tamamlandı!';
-            if (progressFill) progressFill.style.width = '100%';
-            onSettled(true);
-          } else {
-            try {
-              const resp = JSON.parse(xhr.responseText);
-              if (statusText) statusText.textContent = label + 'Hata: ' + (resp.error || 'Yükleme başarısız.');
-            } catch (err) {
-              if (statusText) statusText.textContent = label + 'Sunucu yükleme hatası.';
-            }
-            onSettled(false);
-          }
-        }
-      };
-
-      xhr.open('POST', filehub_vars.rest_url + 'filehub/v1/upload', true);
-      xhr.setRequestHeader('X-WP-Nonce', filehub_vars.nonce);
-      xhr.send(formData);
-    }
-
-    // Uploads a large file's chunks with limited concurrency instead of one-at-a-time:
-    // each chunk is still its own request (server assembles them by index once all have
-    // arrived), but sending several in parallel hides most of the per-request WordPress
-    // bootstrap/auth overhead behind network latency instead of paying it chunk-by-chunk.
-    function uploadFileChunked(file, label, onSettled) {
-      const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-      const fileId = 'file_' + Date.now() + '_' + Math.random().toString(36).substr(2, 8);
-      const startTime = new Date().getTime();
-      const chunkLoadedBytes = new Array(totalChunks).fill(0);
-
-      let nextChunkIndex = 0;
-      let failed = false;
-      let failMessage = '';
-
-      if (statusText) {
-        statusText.textContent = `${label}Parçalı yükleme başlatılıyor (Toplam ${totalChunks} parça)...`;
-      }
-
-      function totalLoaded() {
-        return chunkLoadedBytes.reduce((sum, n) => sum + n, 0);
-      }
-
-      function updateProgress() {
-        const loaded = totalLoaded();
-        const percent = Math.min(100, Math.round((loaded / file.size) * 100));
-
-        if (progressFill) progressFill.style.width = percent + '%';
-
-        if (percent >= 100) {
-          // Every chunk has reached the server, but it still has to merge them and hand the
-          // result off to the storage driver (this is the slow part for a cloud destination) —
-          // without this message the bar just sits at "%100" with no explanation, which reads
-          // as "frozen" and tempts people to refresh mid-upload.
-          if (statusText) {
-            statusText.textContent = label + 'Dosya işleniyor, lütfen bekleyin... Sayfayı kapatmayın veya yenilemeyin.';
-          }
-        } else {
-          const elapsedTime = (new Date().getTime() - startTime) / 1000;
-          const speedBytes = elapsedTime > 0 ? loaded / elapsedTime : 0;
-          const speedMB = (speedBytes / (1024 * 1024)).toFixed(2);
-          if (statusText) statusText.textContent = `${label}Yükleniyor: %${percent} (${speedMB} MB/s)`;
-        }
-      }
-
-      function sendChunk(chunkIndex) {
-        return new Promise(function (resolve) {
-          const start = chunkIndex * CHUNK_SIZE;
-          const end = Math.min(start + CHUNK_SIZE, file.size);
-          const chunkBlob = file.slice(start, end);
-
-          const formData = new FormData();
-          formData.append('chunk', chunkBlob, file.name);
-          formData.append('file_id', fileId);
-          formData.append('chunk_index', chunkIndex);
-          formData.append('total_chunks', totalChunks);
-          formData.append('filename', file.name);
-          formData.append('total_size', file.size);
-
-          const xhr = new XMLHttpRequest();
-
-          xhr.upload.addEventListener('progress', function (e) {
-            if (e.lengthComputable) {
-              chunkLoadedBytes[chunkIndex] = e.loaded;
-              updateProgress();
-            }
-          });
-
-          xhr.onreadystatechange = function () {
-            if (xhr.readyState === XMLHttpRequest.DONE) {
-              if (xhr.status === 200) {
-                chunkLoadedBytes[chunkIndex] = end - start;
-                updateProgress();
-              } else if (!failed) {
-                failed = true;
-                try {
-                  const resp = JSON.parse(xhr.responseText);
-                  failMessage = resp.error || 'Parça yükleme başarısız.';
-                } catch (err) {
-                  failMessage = `Parça ${chunkIndex + 1} yüklenirken sunucu hatası oluştu.`;
-                }
-              }
-              resolve();
-            }
-          };
-
-          xhr.open('POST', filehub_vars.rest_url + 'filehub/v1/upload-chunk', true);
-          xhr.setRequestHeader('X-WP-Nonce', filehub_vars.nonce);
-          xhr.send(formData);
-        });
-      }
-
-      function worker() {
-        if (nextChunkIndex >= totalChunks) {
-          return Promise.resolve();
-        }
-        const chunkIndex = nextChunkIndex++;
-        return sendChunk(chunkIndex).then(worker);
-      }
-
-      const workerCount = Math.min(CHUNK_CONCURRENCY, totalChunks);
-      const workers = [];
-      for (let i = 0; i < workerCount; i++) {
-        workers.push(worker());
-      }
-
-      Promise.all(workers).then(function () {
-        if (failed) {
-          if (statusText) statusText.textContent = label + 'Hata: ' + failMessage;
-          onSettled(false);
-        } else {
-          if (statusText) statusText.textContent = label + 'Tüm parçalar birleştirildi, yükleme başarılı!';
-          if (progressFill) progressFill.style.width = '100%';
-          onSettled(true);
-        }
-      });
-    }
+    do {
+      if (cancelled) throw new DOMException(t('cancelled'), 'AbortError');
+      progress(99, file.name + ': ' + t('processing'));
+      state = (await api('uploads/' + session.id + '/complete', { method: 'POST', signal: controller.signal }, session.token)).data;
+      if (!['processing','done'].includes(state.status)) throw new Error(t('error'));
+    } while (state.status !== 'done');
+    if (!Number.isInteger(state.attachment_id) || state.attachment_id < 1) throw new Error(t('error'));
+    forget(file); progress(100, file.name + ': ' + t('done'));
   }
-
-  // File Manager & Live Search — supports any number of file-list blocks on the same page
-  // (e.g. the uploader shortcode shows the user's own files right below the dropzone).
-  function fetchFileList(container) {
-    if (!container) return;
-    const scope = container.getAttribute('data-scope') || 'own';
-    const perPage = container.getAttribute('data-per-page');
-    let url = filehub_vars.rest_url + 'filehub/v1/files?scope=' + encodeURIComponent(scope);
-    if (perPage) {
-      url += '&per_page=' + encodeURIComponent(perPage);
-    }
-    fetch(url, {
-      headers: {
-        'X-WP-Nonce': filehub_vars.nonce
+  async function runQueue() {
+    if (active) return;
+    active = true; let failures = 0;
+    while (queue.length) {
+      const file = queue.shift(); currentFile = file; cancelled = false; controller = new AbortController();
+      if (cancel) cancel.hidden = false;
+      try { await upload(file); }
+      catch (error) {
+        failures++;
+        if (status) status.textContent = error.name === 'AbortError' ? t('cancelled') : (error.message || t('network')) + ' ' + t('chooseAgain');
       }
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (!Array.isArray(data)) return;
-        fileListCache.set(container, data);
-        renderFileList(container, data);
-      })
-      .catch(err => console.error(err));
-  }
-
-  function refreshAllFileLists() {
-    document.querySelectorAll('.filehub-file-list').forEach(fetchFileList);
-  }
-
-  function renderFileList(container, items) {
-    if (!container) return;
-    // The "Kullanıcı ID" / "Kullanıcı" columns only make sense on the cross-user "all files"
-    // scope (Tüm Dosyalar) — on a user's own file list ("Dosyalarım" / "Yüklediğim Dosyalar")
-    // every row would just repeat their own name and ID, which tells them nothing new.
-    const showOwner = container.getAttribute('data-scope') === 'all';
-    const colCount = showOwner ? 7 : 5;
-    const ownerHeaders = showOwner ? '<th>Kullanıcı ID</th><th>Kullanıcı</th>' : '';
-    let html = '<div class="filehub-table-wrap"><table class="filehub-table"><thead><tr><th>Dosya Adı</th><th>Boyut</th><th>Sürücü</th>' + ownerHeaders + '<th>İndirme</th><th>İşlem</th></tr></thead><tbody>';
-    if (items.length === 0) {
-      html += '<tr><td colspan="' + colCount + '" style="text-align:center; padding: 20px;">Dosya bulunamadı.</td></tr>';
-    } else {
-      items.forEach(item => {
-        const deleteBtn = item.can_delete ? `<button type="button" class="filehub-action-btn filehub-btn-delete filehub-delete-btn" data-id="${item.id}" data-label="Sil">Sil</button>` : '';
-        const ownerCells = showOwner ? `<td>${item.author_id}</td><td>${escapeHtml(item.author_name)}</td>` : '';
-        html += `<tr>
-          <td><strong>${escapeHtml(item.file_name || item.title)}</strong></td>
-          <td>${item.file_size}</td>
-          <td><span class="filehub-driver-badge">${item.driver}</span></td>
-          ${ownerCells}
-          <td>${item.download_count}</td>
-          <td>
-            <a href="${item.download_url}" class="filehub-action-btn filehub-btn-download" target="_blank">İndir</a>
-            ${deleteBtn}
-          </td>
-        </tr>`;
-      });
+      session = null; await refreshLists();
     }
-    html += '</tbody></table></div>';
-    container.innerHTML = html;
-
-    // Attach Delete Event Listeners (scoped to this container only). Instead of a native
-    // browser confirm() popup, the button itself flips into a "confirm?" state on first click
-    // and only actually deletes on the second — reverts automatically if left alone.
-    container.querySelectorAll('.filehub-delete-btn').forEach(btn => {
-      let revertTimer = null;
-      btn.addEventListener('click', function () {
-        const fileId = this.getAttribute('data-id');
-
-        if (this.classList.contains('filehub-btn-confirming')) {
-          clearTimeout(revertTimer);
-          this.textContent = '...';
-          deleteFile(fileId, container);
-          return;
-        }
-
-        this.classList.add('filehub-btn-confirming');
-        this.textContent = 'Onayla?';
-        revertTimer = setTimeout(() => {
-          this.classList.remove('filehub-btn-confirming');
-          this.textContent = this.getAttribute('data-label');
-        }, 3000);
-      });
-    });
+    active = false; if (cancel) cancel.hidden = true;
+    if (bar) bar.style.display = 'none';
+    if (failures && status) status.textContent += ' ' + t('failedFiles');
+    if (input) input.value = '';
   }
-
-  function deleteFile(fileId, container) {
-    fetch(filehub_vars.rest_url + 'filehub/v1/files/' + fileId, {
-      method: 'DELETE',
-      headers: {
-        'X-WP-Nonce': filehub_vars.nonce
-      }
-    })
-      .then(res => res.json())
-      .then(resp => {
-        if (resp.success) {
-          fetchFileList(container);
-        } else {
-          alert(resp.error || 'Silme işlemi başarısız.');
-        }
-      })
-      .catch(err => alert('Sunucu bağlantı hatası.'));
+  if (drop && input) {
+    drop.addEventListener('click', () => input.click());
+    drop.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); input.click(); } });
+    ['dragenter','dragover','dragleave','drop'].forEach(name => drop.addEventListener(name, event => { event.preventDefault(); event.stopPropagation(); drop.classList.toggle('filehub-highlight', name === 'dragenter' || name === 'dragover'); }));
+    drop.addEventListener('drop', event => { queue.push(...Array.from(event.dataTransfer.files)); runQueue(); });
+    input.addEventListener('change', () => { queue.push(...Array.from(input.files)); runQueue(); });
   }
-
-  document.querySelectorAll('.filehub-search-input').forEach(searchInput => {
-    searchInput.addEventListener('input', function () {
-      const scope = searchInput.closest('.filehub-uploader, .filehub-manager');
-      const container = scope ? scope.querySelector('.filehub-file-list') : null;
-      if (!container) return;
-
-      const term = this.value.toLowerCase().trim();
-      const cached = fileListCache.get(container) || [];
-      const filtered = cached.filter(item =>
-        (item.file_name || item.title).toLowerCase().includes(term) || item.author_name.toLowerCase().includes(term)
-      );
-      renderFileList(container, filtered);
-    });
+  if (cancel) cancel.addEventListener('click', async () => {
+    cancelled = true; queue.length = 0; if (controller) controller.abort();
+    const current = session, file = currentFile;
+    if (current) {
+      cancel.disabled = true;
+      try { const result = await api('uploads/' + current.id, { method: 'DELETE' }, current.token); if (file) forget(file); if (status) status.textContent = t(result.data.status === 'done' ? 'done' : 'cancelled'); }
+      catch (error) { if (status) status.textContent = error.message; }
+      finally { cancel.disabled = false; }
+    }
   });
 
-  // Front-End Display Name Update Handler — entirely independent of the password form below,
-  // sends only display_name so the server never even looks at password fields for this request.
-  if (displayNameForm) {
-    displayNameForm.addEventListener('submit', function (e) {
-      e.preventDefault();
-      const display_name = document.getElementById('filehub_display_name').value;
-
-      if (displayNameStatus) displayNameStatus.textContent = 'Güncelleniyor...';
-
-      fetch(filehub_vars.rest_url + 'filehub/v1/update-profile', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-WP-Nonce': filehub_vars.nonce
-        },
-        body: JSON.stringify({ display_name: display_name })
-      })
-        .then(res => res.json())
-        .then(resp => {
-          if (resp.success) {
-            if (displayNameStatus) {
-              displayNameStatus.style.color = '#00a32a';
-              displayNameStatus.textContent = resp.message;
-            }
-            const displayNameHeading = document.getElementById('filehub-profile-display-name');
-            if (displayNameHeading && resp.display_name) {
-              displayNameHeading.textContent = resp.display_name;
-            }
-          } else if (displayNameStatus) {
-            displayNameStatus.style.color = '#b32d2e';
-            displayNameStatus.textContent = resp.error || 'Güncelleme başarısız.';
-          }
-        })
-        .catch(function () {
-          if (displayNameStatus) {
-            displayNameStatus.style.color = '#b32d2e';
-            displayNameStatus.textContent = 'Sunucu bağlantı hatası.';
-          }
-        });
-    });
+  const listStates = new WeakMap();
+  function stateFor(container) {
+    if (!listStates.has(container)) listStates.set(container, { page: 1, search: '', request: null, timers: new Set() });
+    return listStates.get(container);
   }
-
-  // Front-End Password Change Handler — entirely independent of the display name form above,
-  // never sends display_name so the server never touches it for this request.
-  if (passwordForm) {
-    passwordForm.addEventListener('submit', function (e) {
-      e.preventDefault();
-      const current_password = document.getElementById('filehub_current_password').value;
-      const new_password = document.getElementById('filehub_new_password').value;
-      const confirm_password = document.getElementById('filehub_confirm_password').value;
-
-      if (passwordStatus) passwordStatus.textContent = 'Güncelleniyor...';
-
-      fetch(filehub_vars.rest_url + 'filehub/v1/update-profile', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-WP-Nonce': filehub_vars.nonce
-        },
-        body: JSON.stringify({
-          current_password: current_password,
-          new_password: new_password,
-          confirm_password: confirm_password
-        })
-      })
-        .then(res => res.json())
-        .then(resp => {
-          if (resp.success) {
-            if (passwordStatus) {
-              passwordStatus.style.color = '#00a32a';
-              passwordStatus.textContent = resp.message;
-            }
-            passwordForm.reset();
-          } else if (passwordStatus) {
-            passwordStatus.style.color = '#b32d2e';
-            passwordStatus.textContent = resp.error || 'Güncelleme başarısız.';
-          }
-        })
-        .catch(function () {
-          if (passwordStatus) {
-            passwordStatus.style.color = '#b32d2e';
-            passwordStatus.textContent = 'Sunucu bağlantı hatası.';
-          }
-        });
-    });
+  function downloadUrl(raw) {
+    try { const url = new URL(raw); return url.origin === base.origin && (url.searchParams.has('rest_route') ? /^\/filehub\/v1\/download\/\d+$/.test(url.searchParams.get('rest_route')) : url.pathname.startsWith(endpoint('download/').pathname)) && ['http:','https:'].includes(url.protocol) ? url.href : ''; }
+    catch (_) { return ''; }
   }
-
-  // Front-End Registration Handler
-  if (registerForm) {
-    registerForm.addEventListener('submit', function (e) {
-      e.preventDefault();
-      const username = document.getElementById('filehub_reg_username').value;
-      const email = document.getElementById('filehub_reg_email').value;
-      const first_name = document.getElementById('filehub_reg_first_name').value;
-      const last_name = document.getElementById('filehub_reg_last_name').value;
-      const password = document.getElementById('filehub_reg_password').value;
-      const confirm_password = document.getElementById('filehub_reg_confirm_password').value;
-
-      if (registerStatus) {
-        registerStatus.style.color = '#1d2327';
-        registerStatus.textContent = 'Kayıt işlemi yapılıyor...';
+  async function preview(item) {
+    if (item.size_bytes > 8 * 1048576 || !['image/jpeg','image/png','image/gif','image/webp','application/pdf'].includes(item.mime_type)) throw new Error(t('previewLimit'));
+    const url = downloadUrl(item.download_url); if (!url) throw new Error(t('error'));
+    const response = await fetch(url, { credentials: 'same-origin', headers: { 'X-WP-Nonce': config.nonce } });
+    if (!response.ok || Number(response.headers.get('Content-Length')) > 8 * 1048576) throw new Error(t('previewLimit'));
+    const blob = await response.blob(); if (blob.size > 8 * 1048576 || blob.type !== item.mime_type) throw new Error(t('previewLimit'));
+    const objectUrl = URL.createObjectURL(blob); const dialog = node('dialog', undefined, 'filehub-preview');
+    const close = node('button', t('close'), 'button'); close.type = 'button';
+    const media = node(item.mime_type === 'application/pdf' ? 'iframe' : 'img');
+    if (media.tagName === 'IFRAME') { media.setAttribute('sandbox', ''); media.title = item.file_name; } else media.alt = item.file_name;
+    media.src = objectUrl; dialog.append(close, media); document.body.append(dialog);
+    dialog.addEventListener('close', () => { URL.revokeObjectURL(objectUrl); dialog.remove(); }, { once: true });
+    close.addEventListener('click', () => dialog.close()); dialog.showModal();
+  }
+  function render(container, items, pages) {
+    const state = stateFor(container); state.timers.forEach(clearTimeout); state.timers.clear(); container.replaceChildren();
+    const all = container.getAttribute('data-scope') === 'all';
+    const wrap = node('div', undefined, 'filehub-table-wrap'); const table = node('table', undefined, 'filehub-table');
+    const head = node('thead'), tr = node('tr');
+    ['file','size','driver',...(all ? ['owner'] : []),'downloads','actions'].forEach(key => tr.append(node('th', t(key))));
+    head.append(tr); const body = node('tbody'); table.append(head, body); wrap.append(table); container.append(wrap);
+    if (!items.length) { const row = node('tr'), cell = node('td', t('empty')); cell.colSpan = all ? 6 : 5; row.append(cell); body.append(row); }
+    items.forEach(item => {
+      const row = node('tr'); row.append(node('td', item.file_name || item.title), node('td', item.file_size), node('td', item.driver));
+      if (all) row.append(node('td', item.author_name + ' (#' + item.author_id + ')'));
+      row.append(node('td', item.download_count)); const actions = node('td'); row.append(actions); body.append(row);
+      const href = downloadUrl(item.download_url);
+      if (href) { const link = node('a', t('download'), 'filehub-action-btn filehub-btn-download'); link.href = href; link.target = '_blank'; link.rel = 'noopener noreferrer'; actions.append(link); }
+      if (href && item.size_bytes <= 8 * 1048576 && ['image/jpeg','image/png','image/gif','image/webp','application/pdf'].includes(item.mime_type)) {
+        const button = node('button', t('preview'), 'filehub-action-btn'); button.type = 'button'; actions.append(button);
+        button.addEventListener('click', async () => { button.disabled = true; try { await preview(item); } catch (error) { button.textContent = error.message; } finally { button.disabled = false; } });
       }
-
-      fetch(filehub_vars.rest_url + 'filehub/v1/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-WP-Nonce': filehub_vars.nonce
-        },
-        body: JSON.stringify({
-          username: username,
-          email: email,
-          first_name: first_name,
-          last_name: last_name,
-          password: password,
-          confirm_password: confirm_password
-        })
-      })
-        .then(res => res.json())
-        .then(resp => {
-          if (resp.success) {
-            if (registerStatus) {
-              registerStatus.style.color = '#00a32a';
-              registerStatus.textContent = resp.message;
-            }
-            registerForm.reset();
-            setTimeout(() => {
-              window.location.reload();
-            }, 1500);
-          } else {
-            if (registerStatus) {
-              registerStatus.style.color = '#b32d2e';
-              registerStatus.textContent = resp.error || 'Kayıt başarısız.';
-            }
-          }
-        })
-        .catch(err => {
-          if (registerStatus) {
-            registerStatus.style.color = '#b32d2e';
-            registerStatus.textContent = 'Sunucu bağlantı hatası.';
-          }
+      if (item.can_delete) {
+        const button = node('button', t('delete'), 'filehub-action-btn filehub-btn-delete'); button.type = 'button'; actions.append(button);
+        let confirming = false, timer = null;
+        button.addEventListener('click', async () => {
+          if (!confirming) { confirming = true; button.textContent = t('confirm'); timer = setTimeout(() => { confirming = false; button.textContent = t('delete'); state.timers.delete(timer); }, 3000); state.timers.add(timer); return; }
+          clearTimeout(timer); state.timers.delete(timer); button.disabled = true;
+          try { await api('files/' + item.id, { method: 'DELETE' }); await refreshLists(); }
+          catch (error) { button.textContent = error.message; button.disabled = false; }
         });
+      }
+    });
+    const nav = node('div', undefined, 'filehub-pagination');
+    for (const [key, target] of [['previous',state.page-1],['next',state.page+1]]) {
+      const button = node('button', t(key), 'button'); button.type = 'button'; button.disabled = target < 1 || target > pages;
+      button.addEventListener('click', () => { state.page = target; fetchList(container); }); nav.append(button);
+    }
+    nav.setAttribute('aria-label', String(state.page) + '/' + Math.max(1,pages)); container.append(nav);
+  }
+  async function fetchList(container) {
+    const state = stateFor(container); if (state.request) state.request.abort();
+    const request = new AbortController(); state.request = request;
+    const query = new URLSearchParams({ scope: container.getAttribute('data-scope') || 'own', per_page: container.getAttribute('data-per-page') || '25', page: String(state.page), search: state.search });
+    try {
+      const { data, response } = await api('files?' + query.toString(), { signal: request.signal });
+      if (state.request !== request) return;
+      if (!Array.isArray(data)) throw new Error(t('error'));
+      const pages = Number(response.headers.get('X-WP-TotalPages')) || 0;
+      if (state.page > Math.max(1,pages)) { state.page = Math.max(1,pages); return fetchList(container); }
+      render(container, data, pages);
+    } catch (error) {
+      if (error.name === 'AbortError' || state.request !== request) return;
+      const message = node('p', error.message || t('network')); const retry = node('button', t('retry'), 'button'); retry.type = 'button';
+      retry.addEventListener('click', () => fetchList(container)); container.replaceChildren(message, retry);
+    }
+  }
+  function refreshLists() { return Promise.all(Array.from(document.querySelectorAll('.filehub-file-list'), fetchList)); }
+  document.querySelectorAll('.filehub-search-input').forEach(search => {
+    let timer = null;
+    search.addEventListener('input', () => {
+      clearTimeout(timer); timer = setTimeout(() => {
+        const scope = search.closest('.filehub-uploader, .filehub-manager'); const container = scope && scope.querySelector('.filehub-file-list');
+        if (!container) return; const state = stateFor(container); state.page = 1; state.search = search.value; fetchList(container);
+      }, 250);
+    });
+  });
+  function wireForm(id, statusId, path, fields) {
+    const form = document.getElementById(id), message = document.getElementById(statusId); if (!form) return;
+    form.addEventListener('submit', async event => {
+      event.preventDefault(); const button = form.querySelector('[type="submit"]'); if (button.disabled) return;
+      button.disabled = true; if (message) { message.setAttribute('role','status'); message.textContent = t(path === 'register' ? 'registering' : 'updating'); }
+      const values = {}; fields.forEach(([key, field]) => { const el = document.getElementById(field); values[key] = el ? el.value : ''; });
+      try {
+        const { data } = await api(path, json(values), '', 0);
+        if (message) message.textContent = data.message || t('saved');
+        if (data.display_name) { const title = document.getElementById('filehub-profile-display-name'); if (title) title.textContent = data.display_name; }
+        if (data.reload) { if (message) message.textContent = t('refresh'); window.location.reload(); }
+        if (path === 'register' || id === 'filehub-password-form') form.reset();
+      } catch (error) { if (message) message.textContent = error.message || t('network'); }
+      finally { button.disabled = false; }
     });
   }
-
-  function escapeHtml(str) {
-    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  }
-
-  refreshAllFileLists();
+  wireForm('filehub-displayname-form','filehub-displayname-status','update-profile',[['display_name','filehub_display_name']]);
+  wireForm('filehub-password-form','filehub-password-status','update-profile',[['current_password','filehub_current_password'],['new_password','filehub_new_password'],['confirm_password','filehub_confirm_password']]);
+  wireForm('filehub-register-form','filehub-register-status','register',[['username','filehub_reg_username'],['email','filehub_reg_email'],['first_name','filehub_reg_first_name'],['last_name','filehub_reg_last_name'],['password','filehub_reg_password'],['confirm_password','filehub_reg_confirm_password']]);
+  refreshLists();
 });

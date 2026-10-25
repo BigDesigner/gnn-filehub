@@ -39,6 +39,7 @@ class FileHub_Updater {
         add_filter( 'pre_set_site_transient_update_plugins', array( $this, 'check_for_update' ) );
         add_filter( 'plugins_api', array( $this, 'plugin_info' ), 20, 3 );
         add_filter( 'upgrader_post_install', array( $this, 'after_install' ), 10, 3 );
+        add_filter('upgrader_source_selection',array($this,'validate_source'),10,4);
 
         // Admin Manual Check Hooks
         add_action( 'admin_init', array( $this, 'handle_manual_check' ) );
@@ -58,7 +59,7 @@ class FileHub_Updater {
     private function get_remote_release() {
         $cached = get_transient( $this->transient_key );
         if ( false !== $cached ) {
-            return $cached;
+            return is_object($cached) ? $cached : false;
         }
 
         $url  = sprintf( 'https://api.github.com/repos/%s/releases/latest', $this->repo );
@@ -73,13 +74,14 @@ class FileHub_Updater {
         $response = wp_remote_get( $url, $args );
 
         if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {
-            set_transient( $this->transient_key, false, 300 ); // Cache failure for 5 mins
+            set_transient( $this->transient_key, array('failed'=>true), 300 ); // Cache failure for 5 mins
             return false;
         }
 
         $body = json_decode( wp_remote_retrieve_body( $response ) );
 
-        if ( empty( $body ) || ! isset( $body->tag_name ) ) {
+        if ( empty( $body ) || ! isset( $body->tag_name ) || !preg_match('/^v?[0-9]+\.[0-9]+\.[0-9]+$/D',(string)$body->tag_name) ) {
+            set_transient($this->transient_key,array('failed'=>true),300);
             return false;
         }
 
@@ -88,16 +90,14 @@ class FileHub_Updater {
 
         if ( ! empty( $body->assets ) ) {
             foreach ( $body->assets as $asset ) {
-                if ( strpos( $asset->name, '.zip' ) !== false ) {
+                if ( $asset->name === 'gnn-filehub-v' . $remote_version . '.zip' && strpos($asset->browser_download_url, 'https://github.com/' . $this->repo . '/releases/download/v' . $remote_version . '/') === 0 ) {
                     $download_url = $asset->browser_download_url;
                     break;
                 }
             }
         }
 
-        if ( empty( $download_url ) && isset( $body->zipball_url ) ) {
-            $download_url = $body->zipball_url;
-        }
+        if ( empty( $download_url ) ) { set_transient($this->transient_key,array('failed'=>true),300); return false; }
 
         $release_data = (object) array(
             'version'      => $remote_version,
@@ -147,7 +147,7 @@ class FileHub_Updater {
     public function plugin_info( $result, $action, $args ) {
         $plugin_folder = dirname( $this->plugin_slug );
 
-        if ( 'plugin_information' !== $action || ( isset( $args->slug ) && $args->slug !== $plugin_folder ) ) {
+        if ( 'plugin_information' !== $action || ( !isset($args->slug) || $args->slug !== $plugin_folder ) ) {
             return $result;
         }
 
@@ -173,21 +173,16 @@ class FileHub_Updater {
     /**
      * Ensure Target Directory Name Consistency After Automatic Update
      */
-    public function after_install( $response, $hook_extra, $result ) {
-        if ( ! isset( $hook_extra['plugin'] ) || $hook_extra['plugin'] !== $this->plugin_slug ) {
-            return $result;
-        }
-
+    public function after_install($response,$hook_extra,$result) {
+        if(is_wp_error($response) || ($hook_extra['plugin']??'')!==$this->plugin_slug)return $response;
+        delete_transient($this->transient_key);
+        return $response;
+    }
+    public function validate_source($source,$remote_source,$upgrader,$hook_extra) {
+        if(is_wp_error($source) || ($hook_extra['plugin']??'')!==$this->plugin_slug)return $source;
         global $wp_filesystem;
-        $target_dir = WP_PLUGIN_DIR . '/' . dirname( $this->plugin_slug );
-
-        if ( isset( $result['destination'] ) && $result['destination'] !== $target_dir ) {
-            $wp_filesystem->move( $result['destination'], $target_dir );
-            $result['destination'] = $target_dir;
-        }
-
-        delete_transient( $this->transient_key );
-        return $result;
+        if(!$wp_filesystem || !$wp_filesystem->is_file(trailingslashit($source).'gnn-filehub-nextgen.php') || !$wp_filesystem->is_file(trailingslashit($source).'VERSION'))return new WP_Error('filehub_bad_package',__('Güncelleme paketi geçerli bir FileHub paketi değil.','gnn-filehub'));
+        return $source;
     }
 
     /**
@@ -213,6 +208,7 @@ class FileHub_Updater {
      * Clear Cache on Core Updates Screen
      */
     public function clear_cache() {
+        if(!current_user_can('update_plugins'))return;
         delete_transient( $this->transient_key );
     }
 }

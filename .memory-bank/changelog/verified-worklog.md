@@ -121,3 +121,17 @@ after each change, `php -l` / `node -c` clean on every touched file.
   transliteration + `_N` collision suffix, extension-preserving download, `login_form` hook
   firing correctly for a mock reCAPTCHA-style listener. Real Google Drive 500MB upload confirmed
   working by the plugin author on their live site (gnn.tr) post-fix.
+
+## 2026-10-25: Security remediation started
+
+User approved F01-F29 remediation. ADR-0003 supersedes storage/upload assumptions in ADR-0001/0002. Active state, finding coverage and pipeline updated before source changes. No implementation claims yet.
+
+## 2026-10-25: v1.7.0 security remediation verified
+
+Implemented F01-F29 under ADR-0003/0004. Added private local storage/migration, isolated attachments and WordPress capabilities, transactional upload/download staging reservations, real MIME and optional local ClamAV scanning, bounded cloud transfers, safe deletion/reconciliation, paginated search, registration policies and email confirmation, password-session reload, localized/accessibility UI, SQL statistics and checked release packaging.
+
+Evidence: 32/32 real WordPress scenarios (WordPress 7.0.2, PHP 8.5.8, fresh isolated SQLite installation), 15/15 genuine HTTP checks including multipart upload, private stream, local scanner stand-in and cookie/nonce renewal; 14/14 actual-client contract checks and 2/2 concurrent PHP reservation checks. All 14 production PHP files lint clean; JS syntax and catalog/version consistency pass. The plugin ZIP was inspected. Provider HTTP and email were mocked; real R2/Drive accounts, real ClamAV detection, hosting migration/browser matrix and remote MySQL/PHP CI were not executed. No source was changed during the final repeat audit.
+
+## 2026-10-25: Publication policy
+
+User explicitly requested commit/push and GitHub-generated release packages. Local ZIP/checksum artifacts and their current links were removed. Source verification evidence is retained. Publish the changes on main and tag v1.7.0 to trigger the existing release workflow.

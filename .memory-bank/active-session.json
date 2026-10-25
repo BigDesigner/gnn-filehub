@@ -4,24 +4,61 @@
   "status": "ACTIVE",
   "mode": "Interactive",
   "preferred_language": "Turkish",
-  "timestamp": "2026-08-02T21:03:50+03:00",
+  "timestamp": "2026-10-25T21:57:55.748824+03:00",
   "active_branch": "main",
-  "last_commit": null,
+  "last_commit": "f0d2946",
   "git_history_available": true,
-  "worktree_status": "untracked",
+  "worktree_status": "modified",
   "current_sprint": {
-    "sprint_id": "v0.1.0-alpha",
-    "active_tasks": [
-      "Sentinel Memory Bank Bootstrap",
-      "Greenfield WordPress Core Native Plugin Setup"
-    ]
+    "sprint_id": "v1.7.0-security-remediation",
+    "active_tasks": [],
+    "completed_findings": [
+      "F01",
+      "F02",
+      "F03",
+      "F04",
+      "F05",
+      "F06",
+      "F07",
+      "F08",
+      "F09",
+      "F10",
+      "F11",
+      "F12",
+      "F13",
+      "F14",
+      "F15",
+      "F16",
+      "F17",
+      "F18",
+      "F19",
+      "F20",
+      "F21",
+      "F22",
+      "F23",
+      "F24",
+      "F25",
+      "F26",
+      "F27",
+      "F28",
+      "F29"
+    ],
+    "verification": "local-passed; real services/remote CI require deployment verification"
   },
   "tracked_memory_areas": {
     "adr": ".memory-bank/adr/",
     "changelog": ".memory-bank/changelog/",
-    "audits": ".memory-bank/bugs/",
+    "audits": ".memory-bank/audits/",
     "bugs": ".memory-bank/bugs/",
     "tasks": ".tasks/",
     "archive": ".archive/docs-migration/"
-  }
+  },
+  "governance_baseline_hashes": {
+    "constitution": "6f3b9406def113ad3e034080fafbaf619e7cab66f37de1bd2cb469cc908704cd",
+    "boundary_conditions": "a7d88f54150ab2ef1850ed7bdb0cbbb23968f7abb1c874a3e28347ca9738ceb2",
+    "agents_rules": "26a50da40340478c68d31027e5c53ba8cf3ed32c3eddd3b6923ba503ff6a727f"
+  },
+  "source_sha256": "13ba4e32e37c152aa0efe910e1ef33d7a8af63f5a4ceca21e00fa4606db8cf63",
+  "publication_policy": "Commit and push changes; GitHub Actions builds packages from version tags. Do not prepare local distribution packages.",
+  "publication_ref": "v1.7.0"
 }

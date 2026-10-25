@@ -490,3 +490,10 @@
     padding: 16px;
   }
 }
+
+.filehub-dropzone:focus-visible, .filehub-action-btn:focus-visible { outline: 3px solid var(--filehub-theme-color); outline-offset: 3px; }
+.filehub-pagination { display:flex; gap:12px; margin-top:12px; }
+.filehub-preview { max-width: min(90vw, 1000px); max-height: 90vh; border:1px solid var(--filehub-border); border-radius:8px; }
+.filehub-preview img { display:block; max-width:80vw; max-height:75vh; object-fit:contain; }
+.filehub-preview iframe { display:block; width:80vw; height:75vh; border:0; }
+.filehub-password-toggle { margin:4px 0; cursor:pointer; }

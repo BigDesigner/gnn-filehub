@@ -64,26 +64,42 @@ class FileHub_Attachment {
             'post_mime_type' => $mime_type ?: 'application/octet-stream',
             'post_title'     => pathinfo( $file_name, PATHINFO_FILENAME ),
             'post_content'   => '',
-            'post_status'    => 'inherit',
+            'post_status'    => 'private',
             'post_author'    => $user_id,
         );
 
-        $attachment_id = wp_insert_attachment( $attachment_data );
-
-        if ( is_wp_error( $attachment_id ) || ! $attachment_id ) {
-            return new WP_Error( 'filehub_db_error', __( 'Attachment veritabanına kaydedilemedi.', 'gnn-filehub' ) );
+        global $wpdb;
+        $existing=empty($storage_result['upload_id'])?0:(int)$wpdb->get_var($wpdb->prepare("SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key='_filehub_upload_id' AND meta_value=%s LIMIT 1",$storage_result['upload_id']));
+        if($existing && (get_post_type($existing)!=='attachment' || (int)get_post_field('post_author',$existing)!==$user_id))return new WP_Error('filehub_identity_error',__('Yükleme kimliği çakıştı.','gnn-filehub'));
+        if (!$existing && '1' === get_option('filehub_auto_rename','1')) {
+            $candidate=$file_name; $counter=1;
+            while($wpdb->get_var($wpdb->prepare("SELECT p.ID FROM {$wpdb->posts} p JOIN {$wpdb->postmeta} m ON p.ID=m.post_id WHERE p.post_author=%d AND m.meta_key='_filehub_file_name' AND m.meta_value=%s LIMIT 1",$user_id,$candidate))) {
+                $extension=pathinfo($file_name,PATHINFO_EXTENSION);
+                $candidate=pathinfo($file_name,PATHINFO_FILENAME).'_'.($counter++).'.'.$extension;
+            }
+            $file_name=$candidate;
         }
-
-        update_post_meta( $attachment_id, '_filehub_storage_driver', $storage_result['storage_driver'] );
-        update_post_meta( $attachment_id, '_filehub_storage_key', $storage_result['storage_key'] );
-        update_post_meta( $attachment_id, '_filehub_user_id', $user_id );
-        update_post_meta( $attachment_id, '_filehub_file_size', $storage_result['file_size'] );
-        update_post_meta( $attachment_id, '_filehub_download_count', 0 );
-        // post_title strips the extension (PATHINFO_FILENAME above), so the real filename
-        // with its extension is kept separately for downloads/listing.
-        update_post_meta( $attachment_id, '_filehub_file_name', $file_name );
-
-        self::maybe_notify_admin_of_upload( $user_id, $file_name, (int) $storage_result['file_size'], $storage_result['storage_driver'] );
+        $attachment_data['post_title']=$file_name;
+        $metadata=array('_filehub_storage_driver'=>$storage_result['storage_driver'],'_filehub_storage_key'=>$storage_result['storage_key'],'_filehub_user_id'=>$user_id,'_filehub_file_size'=>$storage_result['file_size'],'_filehub_download_count'=>0,'_filehub_file_name'=>$file_name,'_filehub_migrated_v2'=>1);
+        if(!empty($storage_result['upload_id']))$metadata['_filehub_upload_id']=$storage_result['upload_id'];
+        $attachment_data['meta_input']=$metadata;
+        $wpdb->query('START TRANSACTION');
+        if($existing) {
+            $attachment_data['ID']=$existing;
+            $attachment_id=wp_update_post($attachment_data,true);
+        } else $attachment_id=wp_insert_attachment($attachment_data,false,0,true);
+        if(!is_wp_error($attachment_id) && $attachment_id) {
+            foreach($metadata as $key=>$value) {
+                if((string)get_post_meta($attachment_id,$key,true)!==(string)$value) { $wpdb->query('ROLLBACK'); clean_post_cache($attachment_id); return new WP_Error('filehub_db_error',__('Dosya metaverisi kaydedilemedi.','gnn-filehub')); }
+            }
+            update_post_meta($attachment_id,'_filehub_complete',1);
+            if((int)get_post_meta($attachment_id,'_filehub_complete',true)!==1) { $wpdb->query('ROLLBACK'); clean_post_cache($attachment_id); return new WP_Error('filehub_db_error',__('Dosya tamamlanma kaydı yazılamadı.','gnn-filehub')); }
+            $wpdb->query('COMMIT');
+        } else {
+            $wpdb->query('ROLLBACK');
+            return new WP_Error('filehub_db_error',__('Attachment veritabanına kaydedilemedi.','gnn-filehub'));
+        }
+        if(!$existing)self::maybe_notify_admin_of_upload($user_id,$file_name,(int)$storage_result['file_size'],$storage_result['storage_driver']);
 
         return $attachment_id;
     }
@@ -222,12 +238,12 @@ class FileHub_Attachment {
         $custom_quota_mb = (int) get_user_meta( $user_id, '_filehub_custom_quota_mb', true );
 
         if ( $custom_quota_mb > 0 ) {
-            return $custom_quota_mb * 1024 * 1024;
+            return min($custom_quota_mb, (int)floor(PHP_INT_MAX/MB_IN_BYTES)) * MB_IN_BYTES;
         }
 
         // Fallback to default 500 MB global quota
         $default_quota_mb = (int) get_option( 'filehub_default_quota_mb', 500 );
-        return ( $default_quota_mb > 0 ? $default_quota_mb : 500 ) * 1024 * 1024;
+        return min(max(0, $default_quota_mb), (int)floor(PHP_INT_MAX/MB_IN_BYTES)) * MB_IN_BYTES;
     }
 
     /**
@@ -237,7 +253,7 @@ class FileHub_Attachment {
      */
     public static function get_max_upload_bytes(): int {
         $max_upload_mb = (int) get_option( 'filehub_max_upload_mb', 0 );
-        return $max_upload_mb > 0 ? $max_upload_mb * 1024 * 1024 : 0;
+        return $max_upload_mb > 0 ? min($max_upload_mb, (int)floor(PHP_INT_MAX/MB_IN_BYTES)) * MB_IN_BYTES : 0;
     }
 
     /**
@@ -246,90 +262,25 @@ class FileHub_Attachment {
      * @param int $user_id
      * @return array
      */
-    public static function get_user_stats( int $user_id ): array {
-        $query_args = array(
-            'post_type'      => 'attachment',
-            'post_status'    => 'inherit',
-            'posts_per_page' => -1,
-            'author'         => $user_id,
-            'meta_key'       => '_filehub_storage_driver',
-            'fields'         => 'ids',
-        );
-
-        $attachments = get_posts( $query_args );
-        $total_bytes = 0;
-        $total_files = count( $attachments );
-
-        foreach ( $attachments as $att_id ) {
-            $size = (int) get_post_meta( $att_id, '_filehub_file_size', true );
-            $total_bytes += $size;
-        }
-
-        $quota_bytes     = self::get_user_quota( $user_id );
-        $custom_quota_mb = (int) get_user_meta( $user_id, '_filehub_custom_quota_mb', true );
-
-        return array(
-            'file_count'      => $total_files,
-            'total_bytes'     => $total_bytes,
-            'quota_bytes'     => $quota_bytes,
-            'custom_quota_mb' => $custom_quota_mb,
-            'quota_formatted' => size_format( $quota_bytes ),
-            'used_formatted'  => size_format( $total_bytes ),
-            'percentage'      => $quota_bytes > 0 ? min( 100, round( ( $total_bytes / $quota_bytes ) * 100, 1 ) ) : 0,
-        );
+    public static function get_user_stats(int $user_id): array {
+        global $wpdb;
+        $row=$wpdb->get_row($wpdb->prepare("SELECT COUNT(DISTINCT p.ID) AS files, COALESCE(SUM(f.meta_value+0),0) AS bytes FROM {$wpdb->posts} p JOIN {$wpdb->postmeta} d ON d.post_id=p.ID AND d.meta_key='_filehub_storage_driver' JOIN {$wpdb->postmeta} f ON f.post_id=p.ID AND f.meta_key='_filehub_file_size' WHERE p.post_type='attachment' AND p.post_status IN ('private','inherit','trash') AND p.post_author=%d",$user_id));
+        $bytes=(int)$row->bytes; $quota=self::get_user_quota($user_id);
+        return array('file_count'=>(int)$row->files,'total_bytes'=>$bytes,'quota_bytes'=>$quota,'custom_quota_mb'=>(int)get_user_meta($user_id,'_filehub_custom_quota_mb',true),'quota_formatted'=>$quota?size_format($quota):__('Sınırsız','gnn-filehub'),'used_formatted'=>size_format($bytes),'percentage'=>$quota>0?min(100,round($bytes/$quota*100,1)):0);
     }
-
-    /**
-     * Get Total System Storage Statistics across Drivers
-     *
-     * @return array
-     */
     public static function get_system_stats(): array {
-        $query_args = array(
-            'post_type'      => 'attachment',
-            'post_status'    => 'inherit',
-            'posts_per_page' => -1,
-            'meta_key'       => '_filehub_storage_driver',
-        );
-
-        $attachments  = get_posts( $query_args );
-        $total_files  = count( $attachments );
-        $total_bytes  = 0;
-        $driver_bytes = array(
-            'local'  => 0,
-            'r2'     => 0,
-            'gdrive' => 0,
-        );
-        $total_downloads = 0;
-
-        foreach ( $attachments as $post ) {
-            $driver    = get_post_meta( $post->ID, '_filehub_storage_driver', true ) ?: 'local';
-            $size      = (int) get_post_meta( $post->ID, '_filehub_file_size', true );
-            $downloads = (int) get_post_meta( $post->ID, '_filehub_download_count', true );
-
-            $total_bytes += $size;
-            $total_downloads += $downloads;
-
-            if ( isset( $driver_bytes[ $driver ] ) ) {
-                $driver_bytes[ $driver ] += $size;
-            }
+        global $wpdb;
+        $rows=$wpdb->get_results("SELECT d.meta_value AS driver, COUNT(DISTINCT p.ID) AS files, COALESCE(SUM(f.meta_value+0),0) AS bytes, COALESCE(SUM(n.meta_value+0),0) AS downloads FROM {$wpdb->posts} p JOIN {$wpdb->postmeta} d ON d.post_id=p.ID AND d.meta_key='_filehub_storage_driver' JOIN {$wpdb->postmeta} f ON f.post_id=p.ID AND f.meta_key='_filehub_file_size' LEFT JOIN {$wpdb->postmeta} n ON n.post_id=p.ID AND n.meta_key='_filehub_download_count' WHERE p.post_type='attachment' AND p.post_status IN ('private','inherit','trash') GROUP BY d.meta_value");
+        $stats=array('total_files'=>0,'total_bytes'=>0,'total_downloads'=>0,'driver_bytes'=>array('local'=>0,'r2'=>0,'gdrive'=>0));
+        foreach($rows as $row) {
+            $stats['total_files']+=(int)$row->files; $stats['total_bytes']+=(int)$row->bytes; $stats['total_downloads']+=(int)$row->downloads;
+            if(isset($stats['driver_bytes'][$row->driver]))$stats['driver_bytes'][$row->driver]=(int)$row->bytes;
         }
-
-        return array(
-            'total_files'     => $total_files,
-            'total_bytes'     => $total_bytes,
-            'driver_bytes'    => $driver_bytes,
-            'total_downloads' => $total_downloads,
-        );
+        return $stats;
     }
-
-    /**
-     * Increment Attachment Download Count
-     *
-     * @param int $attachment_id
-     */
-    public static function increment_download_count( int $attachment_id ) {
-        $current = (int) get_post_meta( $attachment_id, '_filehub_download_count', true );
-        update_post_meta( $attachment_id, '_filehub_download_count', $current + 1 );
+    public static function increment_download_count(int $attachment_id) {
+        global $wpdb;
+        $wpdb->query($wpdb->prepare("UPDATE {$wpdb->postmeta} SET meta_value=meta_value+1 WHERE post_id=%d AND meta_key='_filehub_download_count'",$attachment_id));
+        wp_cache_delete($attachment_id,'post_meta');
     }
 }

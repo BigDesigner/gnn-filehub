@@ -1,0 +1,253 @@
+{
+  "date": "2026-10-25",
+  "base_commit": "f0d2946",
+  "plugin_version": "1.7.0",
+  "working_tree_sha256": "13ba4e32e37c152aa0efe910e1ef33d7a8af63f5a4ceca21e00fa4606db8cf63",
+  "source_files": {
+    ".github/workflows/release.yml": "719cec4a07dd650ff7becd616dd27e08d0326bb0a97e2e9af624715890683ffe",
+    ".github/workflows/verify.yml": "4ca5c4a4e9e6324f08c8231ba505189fb067a527e065e693dfe10c2542632492",
+    "gnn-filehub/README.md": "b103e71793023b81f5ad9a754a92cca1ba644882838395a3f56c7b0fbfaf6b7b",
+    "gnn-filehub/VERSION": "6f837f6df94a4f15581b7ff8010f059136f17dd5a1c17510129cb4637694bb7b",
+    "gnn-filehub/assets/css/filehub-admin.css": "b7fd252a9a41edcc7c15f4ec02cb8a356b7129dc6cb57e2b2a10e4fceba5cff9",
+    "gnn-filehub/assets/css/filehub-public.css": "41e57445eb7af14ab8b15fbf649f4f20efcde0e9b1f4740a2d667b50e5c6b45a",
+    "gnn-filehub/assets/js/filehub-public.js": "be931e84d1b3fc61ae7f3720e25d2b17c33762edf428e597ed4a5ebc88c41fe8",
+    "gnn-filehub/gnn-filehub-nextgen.php": "a019f01d82076789697d03efab0654aa5186c494510786358982d4edff215181",
+    "gnn-filehub/inc/class-filehub-admin.php": "2c0a0a7c746f1ec5085de200226522249482259ed24df4439cd7f0f75d7c7d51",
+    "gnn-filehub/inc/class-filehub-attachment.php": "bb46759bcfedffed5ec408eae4c6e3fa841425b1a79bf06cfd0416bc7993ec5c",
+    "gnn-filehub/inc/class-filehub-core.php": "8527199303d679d7308e7e7c0bf79999a39186e8d75bdac3565940963f1673a8",
+    "gnn-filehub/inc/class-filehub-lifecycle.php": "609a23c8f6c6bf7a78e6fee5900b71140a4339f30f56e917cad3058f7b11e6ee",
+    "gnn-filehub/inc/class-filehub-rest-api.php": "b973220b43dea6b13224894bae7cb937dadd90703a2ca6c41ba30289a89eccb2",
+    "gnn-filehub/inc/class-filehub-security.php": "e6a4a6e77c79cf2346c768456c23fcb31cf474aa65aef70e8ed8dfb02ebee60e",
+    "gnn-filehub/inc/class-filehub-shortcodes.php": "2ba693e92a3dcbef9f4badb30ee1a99a24915fdf6170bcf9f06cc523cfdf1060",
+    "gnn-filehub/inc/class-filehub-updater.php": "517af6226041df4e97b753dcfe0a8f8d44c213f845b6f15ac4c29ea1f2065d14",
+    "gnn-filehub/inc/class-filehub-uploads.php": "042c6fefedb4f106d75bd7010e3e60e7163ed755f9b78e35a14277118727da56",
+    "gnn-filehub/inc/storage/class-storage-gdrive.php": "1154bd032bebaf81de47330d83bf4f781cb8bc3c3d8a401a95586d1e1f0923c3",
+    "gnn-filehub/inc/storage/class-storage-interface.php": "c70fb5bb0f394c9d226e6182fa8910ce3235834d054e534d4fa731969cbc0671",
+    "gnn-filehub/inc/storage/class-storage-local.php": "d90f0cab44759810ffee80f00b6f571bc2841d3aee1c695e474fb1ec15c7db0b",
+    "gnn-filehub/inc/storage/class-storage-r2.php": "a9c59c01be0b02256fd5fc346244ddfbd6b54255811a0865ba03a8c0aa9c8a09",
+    "gnn-filehub/languages/gnn-filehub.pot": "ae84389057c54bed6f5caf3d313867b83c054f5d4dfb6a70112ab7705e98c210"
+  },
+  "audit_skill_sha256": "6e5599a40752da5d84506988c6503dce2e50781f44bcafb2ce825cd2d90ec060",
+  "results": {
+    "wordpress": {
+      "wordpress": "7.0.2",
+      "php": "8.5.8",
+      "mode": "real WordPress, fresh SQLite database, mocked external HTTP",
+      "passed": 32,
+      "failed": 0,
+      "tests": [
+        {
+          "id": "R01",
+          "test": "Guest downloads require a real owner or administrator",
+          "passed": true
+        },
+        {
+          "id": "R02",
+          "test": "Real local session validates, commits once, and denies another user",
+          "passed": true
+        },
+        {
+          "id": "R03",
+          "test": "Standard media collection and single routes hide FileHub records",
+          "passed": true
+        },
+        {
+          "id": "R04",
+          "test": "Forged PDF content is rejected even with legacy MIME toggle off",
+          "passed": true
+        },
+        {
+          "id": "R05",
+          "test": "Quota reservations account for open uploads and remaining bytes",
+          "passed": true
+        },
+        {
+          "id": "R06",
+          "test": "Legacy upload and R2 presign endpoints are retired",
+          "passed": true
+        },
+        {
+          "id": "R07",
+          "test": "Users cannot increase their own quota",
+          "passed": true
+        },
+        {
+          "id": "R08",
+          "test": "Private directory is outside document root; traversal cannot delete a sibling",
+          "passed": true
+        },
+        {
+          "id": "R09",
+          "test": "Same-name uploads use distinct physical keys and honor rename setting",
+          "passed": true
+        },
+        {
+          "id": "R10",
+          "test": "Invalid chunk index/size and missing uploads fail closed",
+          "passed": true
+        },
+        {
+          "id": "R11",
+          "test": "Ordinary WordPress media is not a FileHub deletion target",
+          "passed": true
+        },
+        {
+          "id": "R12",
+          "test": "Cloud HTTP 403 preserves DB record; 204 permits deletion",
+          "passed": true
+        },
+        {
+          "id": "R13",
+          "test": "File list page two and server search include old records",
+          "passed": true
+        },
+        {
+          "id": "R14",
+          "test": "Unlimited quota is zero and guest statistics are isolated",
+          "passed": true
+        },
+        {
+          "id": "R15",
+          "test": "Profile/registration type errors produce 400 rather than PHP errors",
+          "passed": true
+        },
+        {
+          "id": "R16",
+          "test": "Typed settings normalize extensions and reject arrays",
+          "passed": true
+        },
+        {
+          "id": "R17",
+          "test": "Earlier updater errors are preserved and failed HTTP calls are cached",
+          "passed": true
+        },
+        {
+          "id": "R18",
+          "test": "R2 multipart sends bounded native HTTP requests and verifies final size",
+          "passed": true
+        },
+        {
+          "id": "R19",
+          "test": "Google folder cache is bound to account/parent configuration",
+          "passed": true
+        },
+        {
+          "id": "R20",
+          "test": "Failed/cancelled sessions retain reservations until cleanup succeeds",
+          "passed": true
+        },
+        {
+          "id": "R21",
+          "test": "Registration policy hook runs and unverified accounts cannot log in",
+          "passed": true
+        },
+        {
+          "id": "R22",
+          "test": "Private legacy migration preserves content and removes public copy",
+          "passed": true
+        },
+        {
+          "id": "R23",
+          "test": "Download counter increments atomically and all statistics use real SQL",
+          "passed": true
+        },
+        {
+          "id": "R24",
+          "test": "Bad upload nonce is rejected by the actual route permission callback",
+          "passed": true
+        },
+        {
+          "id": "R25",
+          "test": "Password changes explicitly require client session reload",
+          "passed": true
+        },
+        {
+          "id": "R26",
+          "test": "Google resumable offset recovers a lost completion without creating a second file",
+          "passed": true
+        },
+        {
+          "id": "R27",
+          "test": "Download staging reservations prevent unbounded parallel disk use",
+          "passed": true
+        },
+        {
+          "id": "R28",
+          "test": "A lowered quota is rechecked before committing a previously reserved file",
+          "passed": true
+        },
+        {
+          "id": "R29",
+          "test": "Partial attachment metadata is repaired idempotently before commit",
+          "passed": true
+        },
+        {
+          "id": "R30",
+          "test": "Antivirus endpoints are restricted to explicit local services",
+          "passed": true
+        },
+        {
+          "id": "R31",
+          "test": "WordPress editor capabilities cannot take over another members FileHub file",
+          "passed": true
+        },
+        {
+          "id": "R32",
+          "test": "Retained trash files still count against real storage quota",
+          "passed": true
+        }
+      ]
+    },
+    "http": {
+      "mode": "real HTTP, WordPress cookies, PHP multipart upload and private stream",
+      "passed": 15,
+      "checks": [
+        "HTTP anonymous upload is denied",
+        "Cookie-authenticated session is created",
+        "Genuine PHP multipart uploads validate all chunks",
+        "HTTP completion has a committed attachment ID",
+        "Anonymous download of a real member file is denied",
+        "Owner receives byte-identical content with private cache policy",
+        "A wrong upload token cannot read session state",
+        "Server search finds the committed file",
+        "HTTP delete removes physical and indexed file",
+        "Deleted file no longer downloads",
+        "ClamAV protocol malware result blocks publication",
+        "Rejected scanner file can be cancelled and cleaned",
+        "HTTP password change signals required session reload",
+        "Previous REST nonce is rejected after password session change",
+        "Reloaded session can immediately update profile"
+      ]
+    },
+    "concurrency": {
+      "mode": "two concurrent PHP processes, real WordPress and database",
+      "passed": 2,
+      "statuses": [
+        200,
+        409
+      ],
+      "reserved": 700000
+    },
+    "client": {
+      "mode": "actual JS asset, minimal DOM and HTTP contract stub",
+      "passed": 14,
+      "scenarios": [
+        {
+          "apiUrl": "https://site.invalid/sub/wp-json/filehub/v1/",
+          "checks": 7
+        },
+        {
+          "apiUrl": "https://site.invalid/index.php?rest_route=/filehub/v1/",
+          "checks": 7
+        }
+      ]
+    }
+  },
+  "not_run": [
+    "Remote GitHub Actions matrix on MySQL/PHP 8.0, 8.3, 8.4",
+    "Live R2/Drive credential and large-file tests",
+    "Real ClamAV engine detection (only INSTREAM stand-in tested)",
+    "Production host migration/reverse-proxy/theme/browser matrix"
+  ],
+  "fingerprint_algorithm": "SHA-256 of relative POSIX path + NUL + content; paths sorted by Unicode codepoint"
+}

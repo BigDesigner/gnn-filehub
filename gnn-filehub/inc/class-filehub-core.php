@@ -38,6 +38,9 @@ class FileHub_Core {
      * Load Plugin Dependencies
      */
     private function load_dependencies() {
+        require_once GNN_FILEHUB_PATH . 'inc/class-filehub-security.php';
+        require_once GNN_FILEHUB_PATH . 'inc/class-filehub-uploads.php';
+        require_once GNN_FILEHUB_PATH . 'inc/class-filehub-lifecycle.php';
         require_once GNN_FILEHUB_PATH . 'inc/storage/class-storage-interface.php';
         require_once GNN_FILEHUB_PATH . 'inc/storage/class-storage-local.php';
         require_once GNN_FILEHUB_PATH . 'inc/storage/class-storage-r2.php';
@@ -53,7 +56,9 @@ class FileHub_Core {
      * Register Core Hooks & Subsystems
      */
     private function init_hooks() {
-        add_action( 'init', array( $this, 'ensure_protected_storage_dir' ) );
+        add_action('init',function(){load_plugin_textdomain('gnn-filehub',false,dirname(plugin_basename(GNN_FILEHUB_FILE)).'/languages');},0);
+        new FileHub_Lifecycle();
+        new FileHub_Updater();
 
         // Instantiate Subsystems
         new FileHub_REST_API();
@@ -61,10 +66,10 @@ class FileHub_Core {
 
         if ( is_admin() ) {
             new FileHub_Admin();
-            new FileHub_Updater();
+
         }
 
-        // Keep regular front-end members (anyone below Editor) entirely out of wp-admin — they
+        // Keep regular front-end members (users without edit_posts) entirely out of wp-admin — they
         // should never need it and should never land there by accident (a stray bookmark, a
         // broken link, a plugin/theme calling login_url()/register_url() somewhere).
         add_filter( 'show_admin_bar', array( $this, 'maybe_hide_admin_bar' ) );
@@ -75,7 +80,7 @@ class FileHub_Core {
     }
 
     /**
-     * Hide the Admin Bar on the Front End for Members Who Aren't Editors/Admins
+     * Hide the Admin Bar on the Front End for Members Without edit_posts
      */
     public function maybe_hide_admin_bar( $show ) {
         if ( is_user_logged_in() && ! current_user_can( 'edit_posts' ) ) {
@@ -85,7 +90,7 @@ class FileHub_Core {
     }
 
     /**
-     * Block wp-admin Dashboard Access for Members Who Aren't Editors/Admins
+     * Block wp-admin Dashboard Access for Members Without edit_posts
      * Sends them back to the front-end account page instead of ever showing them wp-admin.
      */
     public function maybe_block_wp_admin_access() {
@@ -140,7 +145,7 @@ class FileHub_Core {
 
         $url = get_permalink( $account_page_id );
         if ( $redirect ) {
-            $url = add_query_arg( 'redirect_to', rawurlencode( $redirect ), $url );
+            $url = add_query_arg( 'redirect_to', $redirect, $url );
         }
 
         return $url;
@@ -157,67 +162,12 @@ class FileHub_Core {
     /**
      * Ensure Local Protected Storage directory exists with .htaccess protection
      */
-    public function ensure_protected_storage_dir() {
-        $upload_dir    = wp_upload_dir();
-        $protected_dir = $upload_dir['basedir'] . '/filehub-protected';
-
-        if ( ! file_exists( $protected_dir ) ) {
-            wp_mkdir_p( $protected_dir );
-        }
-
-        $htaccess_file = $protected_dir . '/.htaccess';
-        if ( ! file_exists( $htaccess_file ) ) {
-            @file_put_contents( $htaccess_file, "Deny from all\n" );
-        }
-
-        $index_file = $protected_dir . '/index.html';
-        if ( ! file_exists( $index_file ) ) {
-            @file_put_contents( $index_file, '' );
-        }
-
-        $this->ensure_chunk_storage_dir();
-    }
-
-    /**
-     * Ensure Temporary Chunk Storage directory exists with .htaccess protection
-     */
-    public function ensure_chunk_storage_dir() {
-        $upload_dir = wp_upload_dir();
-        $chunks_dir = $upload_dir['basedir'] . '/filehub-protected/chunks';
-
-        if ( ! file_exists( $chunks_dir ) ) {
-            wp_mkdir_p( $chunks_dir );
-        }
-
-        $htaccess_file = $chunks_dir . '/.htaccess';
-        if ( ! file_exists( $htaccess_file ) ) {
-            @file_put_contents( $htaccess_file, "Deny from all\n" );
-        }
-    }
-
-    /**
-     * Plugin Activation Handler
-     */
+    public function ensure_protected_storage_dir() { return FileHub_Security::private_dir(); }
+    public function ensure_chunk_storage_dir() { return FileHub_Security::private_dir(); }
     public static function activate() {
-        $upload_dir    = wp_upload_dir();
-        $protected_dir = $upload_dir['basedir'] . '/filehub-protected';
-
-        if ( ! file_exists( $protected_dir ) ) {
-            wp_mkdir_p( $protected_dir );
-        }
-
-        $htaccess_file = $protected_dir . '/.htaccess';
-        if ( ! file_exists( $htaccess_file ) ) {
-            @file_put_contents( $htaccess_file, "Deny from all\n" );
-        }
-
-        flush_rewrite_rules();
+        self::get_instance();
+        FileHub_Uploads::install();
+        if(!wp_next_scheduled('filehub_cleanup'))wp_schedule_event(time()+60,'hourly','filehub_cleanup');
     }
-
-    /**
-     * Plugin Deactivation Handler
-     */
-    public static function deactivate() {
-        flush_rewrite_rules();
-    }
+    public static function deactivate() { wp_clear_scheduled_hook('filehub_cleanup'); }
 }

@@ -201,11 +201,7 @@ class FileHub_Shortcodes {
             true
         );
 
-        wp_localize_script( 'filehub-public-js', 'filehub_vars', array(
-            'rest_url'      => esc_url_raw( rest_url() ),
-            'nonce'         => wp_create_nonce( 'wp_rest' ),
-            'active_driver' => get_option( 'filehub_storage_driver', 'local' ),
-        ) );
+        wp_localize_script('filehub-public-js','filehub_vars',FileHub_Security::client_config());
     }
 
     /**
@@ -227,7 +223,7 @@ class FileHub_Shortcodes {
             ?>
             <div class="filehub-card filehub-uploader">
                 <h3><?php esc_html_e( 'Dosya Yükle', 'gnn-filehub' ); ?></h3>
-                <div id="filehub-dropzone" class="filehub-dropzone">
+                <div id="filehub-dropzone" class="filehub-dropzone" role="button" tabindex="0" aria-label="<?php esc_attr_e('Dosya seç','gnn-filehub'); ?>">
                     <svg class="filehub-dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path d="M12 15V3M12 3L7.5 7.5M12 3l4.5 4.5"></path>
                         <path d="M3 15v3a3 3 0 0 0 3 3h12a3 3 0 0 0 3-3v-3"></path>
@@ -240,7 +236,7 @@ class FileHub_Shortcodes {
                 <div id="filehub-progress-bar" class="filehub-progress-bar" style="display: none; margin-top: 15px;">
                     <div id="filehub-progress-fill" class="filehub-progress-fill" style="width: 0%;"></div>
                 </div>
-                <p id="filehub-status-text" style="margin-top: 10px; font-weight: 600;"></p>
+                <button type="button" class="button" id="filehub-upload-cancel" hidden><?php esc_html_e('Yüklemeyi iptal et','gnn-filehub'); ?></button><p id="filehub-status-text" role="status" aria-live="polite" style="margin-top: 10px; font-weight: 600;"></p>
             </div>
 
             <?php if ( $show_own_files ) : ?>
@@ -375,7 +371,7 @@ class FileHub_Shortcodes {
         ob_start();
         wp_login_form( array(
             'echo'           => true,
-            'redirect'       => get_permalink(),
+            'redirect'       => isset($_GET['redirect_to']) && is_string($_GET['redirect_to']) ? wp_validate_redirect(wp_unslash($_GET['redirect_to']),get_permalink()) : get_permalink(),
             'form_id'        => 'filehub-login-form',
             'label_username' => __( 'Kullanıcı Adı veya E-posta', 'gnn-filehub' ),
             'label_password' => __( 'Şifre', 'gnn-filehub' ),
@@ -467,11 +463,11 @@ class FileHub_Shortcodes {
                 </div>
                 <div class="filehub-field">
                     <label for="filehub_reg_password"><?php esc_html_e( 'Şifre *', 'gnn-filehub' ); ?></label>
-                    <input type="password" id="filehub_reg_password" required minlength="6">
+                    <input type="password" id="filehub_reg_password" required minlength="12">
                 </div>
                 <div class="filehub-field">
                     <label for="filehub_reg_confirm_password"><?php esc_html_e( 'Şifre (Tekrar) *', 'gnn-filehub' ); ?></label>
-                    <input type="password" id="filehub_reg_confirm_password" required minlength="6">
+                    <input type="password" id="filehub_reg_confirm_password" required minlength="12">
                 </div>
                 <button type="submit" class="button button-primary" style="width: 100%; padding: 8px; font-size: 1.05em;"><?php esc_html_e( 'Kayıt Ol', 'gnn-filehub' ); ?></button>
             </form>
@@ -690,11 +686,11 @@ class FileHub_Shortcodes {
                 </div>
                 <div class="filehub-field">
                     <label for="filehub_new_password"><?php esc_html_e( 'Yeni Şifre', 'gnn-filehub' ); ?></label>
-                    <input type="password" id="filehub_new_password" required minlength="6">
+                    <input type="password" id="filehub_new_password" required minlength="12">
                 </div>
                 <div class="filehub-field">
                     <label for="filehub_confirm_password"><?php esc_html_e( 'Yeni Şifre (Tekrar)', 'gnn-filehub' ); ?></label>
-                    <input type="password" id="filehub_confirm_password" required minlength="6">
+                    <input type="password" id="filehub_confirm_password" required minlength="12">
                 </div>
                 <button type="submit" class="button button-primary" style="width: 100%; padding: 6px;"><?php esc_html_e( 'Şifre Güncelle', 'gnn-filehub' ); ?></button>
             </form>

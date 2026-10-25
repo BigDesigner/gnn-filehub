@@ -1,0 +1,115 @@
+{
+    "mode": "isolated real-class reproductions, simulated WordPress and HTTP",
+    "reproduced": 18,
+    "total": 18,
+    "checks": [
+        {
+            "id": "T01",
+            "description": "Single upload succeeds even when quota is full",
+            "ok": true,
+            "detail": ""
+        },
+        {
+            "id": "T02",
+            "description": "Chunk merge exceeds remaining quota",
+            "ok": true,
+            "detail": ""
+        },
+        {
+            "id": "T03",
+            "description": "Strict MIME accepts plain text named PDF",
+            "ok": true,
+            "detail": ""
+        },
+        {
+            "id": "T04",
+            "description": "R2 finalize permits duplicate records and forbidden filename",
+            "ok": true,
+            "detail": ""
+        },
+        {
+            "id": "T05",
+            "description": "Same-second R2 uploads share the same key",
+            "ok": true,
+            "detail": ""
+        },
+        {
+            "id": "T06",
+            "description": "Cloud HTTP 403 still removes DB record and reports success",
+            "ok": true,
+            "detail": ""
+        },
+        {
+            "id": "T07",
+            "description": "User with edit-self permission can raise own quota",
+            "ok": true,
+            "detail": ""
+        },
+        {
+            "id": "T08",
+            "description": "Anonymous guest download passes ownership and reaches storage",
+            "ok": true,
+            "detail": ""
+        },
+        {
+            "id": "T09",
+            "description": "Zero unlimited quota actually returns 500 MB",
+            "ok": true,
+            "detail": ""
+        },
+        {
+            "id": "T10",
+            "description": "Missing profile JSON throws TypeError",
+            "ok": true,
+            "detail": ""
+        },
+        {
+            "id": "T11",
+            "description": "Out-of-range chunk index is saved",
+            "ok": true,
+            "detail": ""
+        },
+        {
+            "id": "T12",
+            "description": "Failed chunk copy still returns chunk_saved",
+            "ok": true,
+            "detail": ""
+        },
+        {
+            "id": "T13",
+            "description": "Updater false cache repeats failed network calls",
+            "ok": true,
+            "detail": ""
+        },
+        {
+            "id": "T14",
+            "description": "Google Drive parent change reuses old cached user folder",
+            "ok": true,
+            "detail": ""
+        },
+        {
+            "id": "T15",
+            "description": "File listing ignores page two",
+            "ok": true,
+            "detail": ""
+        },
+        {
+            "id": "T16",
+            "description": "Delete endpoint accepts ordinary non-FileHub media",
+            "ok": true,
+            "detail": ""
+        },
+        {
+            "id": "T17",
+            "description": "Path prefix check accepts sibling storage directory",
+            "ok": true,
+            "detail": ""
+        },
+        {
+            "id": "T18",
+            "description": "Updater discards an earlier installation error for another plugin",
+            "ok": true,
+            "detail": ""
+        }
+    ]
+}

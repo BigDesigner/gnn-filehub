@@ -11,3 +11,7 @@ Thumbs.db
 # Environment / Logs
 *.log
 .env
+
+# Disposable local QA runtime (never ship WordPress, database, fixtures or credentials)
+.tests/runtime/
+.tests/__pycache__/

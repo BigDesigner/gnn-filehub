@@ -1,0 +1,67 @@
+name: Verify
+on:
+  push:
+    branches: ['main']
+  pull_request:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - php: '8.0'
+            wordpress: '6.0'
+          - php: '8.3'
+            wordpress: 'latest'
+          - php: '8.4'
+            wordpress: 'latest'
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: synthetic-ci-only
+          MYSQL_DATABASE: filehub_test
+        ports: ['3306:3306']
+        options: --health-cmd="mysqladmin ping -h localhost -psynthetic-ci-only" --health-interval=10s --health-timeout=5s --health-retries=10
+    env:
+      FILEHUB_TEST_DB_HOST: 127.0.0.1:3306
+      FILEHUB_TEST_DB_NAME: filehub_test
+      FILEHUB_TEST_DB_USER: root
+      FILEHUB_TEST_DB_PASSWORD: synthetic-ci-only
+    steps:
+      - uses: actions/checkout@v7
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mysqli, fileinfo, mbstring, zip
+          coverage: none
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          package-manager-cache: false
+      - name: Syntax and release consistency
+        run: |
+          find gnn-filehub .tests -name '*.php' -not -path '.tests/runtime/*' -print0 | xargs -0 -n1 php -l
+          node --check gnn-filehub/assets/js/filehub-public.js
+          python3 .tests/check-release.py
+      - name: Prepare disposable WordPress
+        run: python3 .tests/prepare-runtime.py --backend mysql --wordpress "${{ matrix.wordpress }}"
+      - name: WordPress regressions and concurrent quota reservations
+        run: |
+          php .tests/test-regressions.php
+          python3 .tests/test-concurrency.py
+      - name: Real HTTP and client contract
+        run: |
+          python3 .tests/test-http.py --serve
+          node .tests/test-client.cjs
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: verification-php${{ matrix.php }}-wp${{ matrix.wordpress }}
+          path: .tests/runtime/*results.json
+          include-hidden-files: true
+          if-no-files-found: ignore

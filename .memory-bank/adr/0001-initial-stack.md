@@ -1,8 +1,13 @@
 # ADR 0001: Zero-Dependency WordPress Core Native Architecture
 
-- **Status**: Accepted
+> [!WARNING]
+> **SUPERSEDED ARCHITECTURAL DECISION**
+> Superseded on 2026-10-25 by [ADR-0003](0003-private-storage-and-transactional-uploads.md). Refer to that record for active architecture and migration guidance.
+
+- **Status**: Superseded by [ADR-0003](0003-private-storage-and-transactional-uploads.md)
 - **Confidence**: Verified
 - **Date**: 2026-08-02
+- **Superseded By**: [ADR-0003](0003-private-storage-and-transactional-uploads.md)
 
 ## Context
 The GNN FileHub NextGen plugin requires a resilient, low-maintenance architecture that prevents breaking changes across WordPress updates, avoids PHP execution vulnerabilities (RCE), eliminates database I/O bottlenecks caused by `scandir()` disk lookups, and supports multi-provider storage (Local, Cloudflare R2, Google Drive).

@@ -1,169 +1,97 @@
 <?php
-if ( ! defined( 'ABSPATH' ) ) {
-    exit;
-}
+if ( ! defined( 'ABSPATH' ) ) { exit; }
 
-require_once GNN_FILEHUB_PATH . 'inc/storage/class-storage-interface.php';
-require_once GNN_FILEHUB_PATH . 'inc/class-filehub-attachment.php';
-
-/**
- * Class FileHub_Storage_Local
- * Local Protected Storage driver with .htaccess isolation and REST proxy stream delivery.
- */
 class FileHub_Storage_Local implements FileHub_Storage_Interface {
-
-    /**
-     * Get Base Protected Storage Directory Path
-     * @return string
-     */
-    private function get_protected_base_dir(): string {
-        $upload_dir = wp_upload_dir();
-        return $upload_dir['basedir'] . '/filehub-protected';
+    private function same_content(string $a,string $b): bool {
+        $first=FileHub_Security::file_hash($a); $second=FileHub_Security::file_hash($b);
+        return is_string($first) && is_string($second) && hash_equals($first,$second);
+    }
+    private function prepare_parent(string $path) {
+        $root=FileHub_Security::private_dir(); if(is_wp_error($root))return false;
+        if(!wp_mkdir_p(dirname($path)))return false;
+        $parent=realpath(dirname($path)); $base=realpath($root.'/objects');
+        return $parent && $base && ($parent===$base || FileHub_Security::inside($parent,$base));
     }
 
-    /**
-     * Upload File to Local Protected Path
-     *
-     * @param array $file
-     * @param int   $user_id
-     * @return array|WP_Error
-     */
+    private function resolve( string $key, bool $existing = true ) {
+        $root=FileHub_Security::private_dir();
+        if(is_wp_error($root))return $root;
+        if(!$key || strpos($key,chr(0))!==false || strpos($key,':')!==false || strpos($key,chr(92))!==false || $key[0]==='/' || array_intersect(explode('/',$key),array('','..','.')))return FileHub_Security::error(__('Geçersiz depolama anahtarı.','gnn-filehub'));
+        $base=$root.'/objects';
+        if(!is_dir($base) && !wp_mkdir_p($base))return FileHub_Security::error(__('Depolama oluşturulamadı.','gnn-filehub'),503);
+        $path=$base.'/'.$key;
+        if(!$existing)return $path;
+        $real=realpath($path);
+        return $real && is_file($real) && FileHub_Security::inside($real,realpath($base)) ? $real : FileHub_Security::error(__('Dosya bulunamadı.','gnn-filehub'),404);
+    }
+
     public function upload_file( array $file, int $user_id ) {
-        $tmp_name = ! empty( $file['tmp_name'] ) ? $file['tmp_name'] : '';
-
-        // Single-shot uploads arrive as a genuine PHP upload (is_uploaded_file() is true).
-        // Chunked uploads are merged server-side beforehand into a temp file we created
-        // ourselves in sys_get_temp_dir() (see FileHub_REST_API::merge_uploaded_chunks()),
-        // so it will never pass is_uploaded_file() — accept it instead by confirming it
-        // really does live inside the system temp directory, not an arbitrary path.
-        $is_real_upload   = $tmp_name && is_uploaded_file( $tmp_name );
-        $real_tmp_dir     = realpath( sys_get_temp_dir() );
-        $real_tmp_name    = $tmp_name ? realpath( $tmp_name ) : false;
-        $is_assembled_tmp = ! $is_real_upload && $real_tmp_name && $real_tmp_dir && 0 === strpos( $real_tmp_name, $real_tmp_dir );
-
-        if ( ! $is_real_upload && ! $is_assembled_tmp ) {
-            return new WP_Error( 'filehub_invalid_upload', __( 'Geçersiz dosya yükleme isteği.', 'gnn-filehub' ) );
-        }
-
-        $base_dir = $this->get_protected_base_dir();
-        $user_dir = $base_dir . '/' . $user_id;
-
-        if ( ! file_exists( $user_dir ) ) {
-            wp_mkdir_p( $user_dir );
-        }
-
-        $filename      = FileHub_Attachment::sanitize_upload_filename( $file['name'] );
-        $file_info     = pathinfo( $filename );
-        $name_part     = $file_info['filename'];
-        $extension     = isset( $file_info['extension'] ) ? '.' . strtolower( $file_info['extension'] ) : '';
-
-        $counter       = 1;
-        $unique_name   = $filename;
-        $target_path   = $user_dir . '/' . $unique_name;
-
-        // Collision avoidance
-        while ( file_exists( $target_path ) ) {
-            $unique_name = $name_part . '_' . $counter . $extension;
-            $target_path = $user_dir . '/' . $unique_name;
-            $counter++;
-        }
-
-        if ( $is_real_upload ) {
-            $moved = move_uploaded_file( $tmp_name, $target_path );
+        $root=FileHub_Security::private_dir(); if(is_wp_error($root))return $root;
+        $source=realpath($file['tmp_name']??'');
+        if(!$source || (!is_uploaded_file($source) && !FileHub_Security::inside($source,$root.'/sessions')))return FileHub_Security::error(__('Geçersiz yükleme kaynağı.','gnn-filehub'));
+        $session=$file['session_id']??wp_generate_uuid4();
+        if(!is_string($session) || !preg_match('/^[a-f0-9-]{36}$/D',$session))return FileHub_Security::error(__('Geçersiz yükleme oturumu.','gnn-filehub'));
+        $key=$user_id.'/'.$session;
+        $target=$this->resolve($key,false); if(is_wp_error($target))return $target;
+        if(!$this->prepare_parent($target))return FileHub_Security::error(__('Depolama oluşturulamadı.','gnn-filehub'),503);
+        // Deterministic session key makes retries safe; exclusive creation prevents overwrite.
+        $fp=@fopen($target,'xb');
+        if(!$fp) {
+            if(!is_file($target) || filesize($target)!==filesize($source) || !$this->same_content($source,$target))return FileHub_Security::error(__('Depolama anahtarı çakıştı.','gnn-filehub'),409);
         } else {
-            $moved = @rename( $tmp_name, $target_path );
-            if ( ! $moved ) {
-                $moved = @copy( $tmp_name, $target_path );
-                if ( $moved ) {
-                    @unlink( $tmp_name );
-                }
-            }
+            $in=@fopen($source,'rb');
+            $ok=$in && FileHub_Security::copy_stream($in,$fp,filesize($source));
+            if($in)fclose($in); fclose($fp);
+            if(!$ok) { @unlink($target); return FileHub_Security::error(__('Dosya kaydedilemedi.','gnn-filehub'),500); }
         }
-
-        if ( ! $moved ) {
-            return new WP_Error( 'filehub_move_failed', __( 'Dosya korumalı dizine taşınamadı.', 'gnn-filehub' ) );
-        }
-
-        $relative_key = $user_id . '/' . $unique_name;
-
-        return array(
-            'storage_driver' => 'local',
-            'storage_key'    => $relative_key,
-            'file_name'      => $unique_name,
-            'file_size'      => filesize( $target_path ),
-            'file_path'      => $target_path,
-        );
+        @chmod($target,0600);
+        return array('storage_driver'=>'local','storage_key'=>$key,'file_name'=>FileHub_Attachment::sanitize_upload_filename($file['name']),'file_size'=>filesize($target));
     }
 
-    /**
-     * Delete Local Protected File
-     *
-     * @param string $file_identifier Relative storage key e.g. "user_id/filename.ext"
-     * @return bool|WP_Error
-     */
+    /** Preserve file IDs/keys while copying legacy web files into private storage. */
+    public function migrate_key( string $key ) {
+        $target=$this->resolve($key,false); if(is_wp_error($target))return $target;
+        $uploads=wp_upload_dir(); $private=FileHub_Security::private_dir(); if(is_wp_error($private))return $private;
+        $public=$uploads['basedir'].'/filehub-protected';
+        $legacy=is_file($public.'/'.$key)?$public:$private.'/legacy';
+        $old=realpath($legacy.'/'.$key); $base=realpath($legacy);
+        if(!$old || !$base || !is_file($old) || !FileHub_Security::inside($old,$base))return FileHub_Security::error(__('Eski yerel dosya bulunamadı.','gnn-filehub'),404);
+        if(!$this->prepare_parent($target))return FileHub_Security::error(__('Özel depolamaya geçiş yapılamadı.','gnn-filehub'),503);
+        $out=@fopen($target,'xb');
+        if($out) {
+            $in=@fopen($old,'rb'); $ok=$in && FileHub_Security::copy_stream($in,$out,filesize($old));
+            if($in)fclose($in); fclose($out);
+            if(!$ok) { @unlink($target); return FileHub_Security::error(__('Dosya geçişi tamamlanamadı.','gnn-filehub'),500); }
+        }
+        $real=realpath($target);
+        $private=FileHub_Security::private_dir();
+        if(!$real || is_wp_error($private) || !FileHub_Security::inside($real,$private) || !$this->same_content($old,$real))return FileHub_Security::error(__('Geçiş bütünlüğü doğrulanamadı.','gnn-filehub'),500);
+        @chmod($real,0600);
+        if(!unlink($old))return FileHub_Security::error(__('Eski herkese açık dosya kaldırılamadı.','gnn-filehub'),503);
+        $alternate=$private.'/legacy/'.$key;
+        if(is_file($alternate) && $alternate!==$old && $this->same_content($alternate,$real))@unlink($alternate);
+        clearstatcache();
+        return $real;
+    }
+
     public function delete_file( string $file_identifier ) {
-        $clean_key   = ltrim( sanitize_text_field( $file_identifier ), '/\\' );
-        $target_path = $this->get_protected_base_dir() . '/' . $clean_key;
-
-        // Prevent directory traversal
-        $real_target = realpath( $target_path );
-        $real_base   = realpath( $this->get_protected_base_dir() );
-
-        if ( $real_target && $real_base && strpos( $real_target, $real_base ) === 0 && file_exists( $real_target ) ) {
-            if ( @unlink( $real_target ) ) {
-                return true;
-            }
-            return new WP_Error( 'filehub_delete_failed', __( 'Dosya sistemden silinemedi.', 'gnn-filehub' ) );
+        $migration=$this->migrate_key($file_identifier);
+        if(is_wp_error($migration) && (int)($migration->get_error_data()['status']??500)!==404)return $migration;
+        $path=$this->resolve($file_identifier);
+        if(is_wp_error($path)) {
+            // A legacy file must also be removed; never return success just because the new path is absent.
+            $migrated=$this->migrate_key($file_identifier);
+            if(is_wp_error($migrated))return (int)($migrated->get_error_data()['status']??500)===404 ? true : $migrated;
+            $path=$migrated;
         }
-
-        return true; // Already gone or non-existent
+        return @unlink($path) ? true : FileHub_Security::error(__('Dosya silinemedi.','gnn-filehub'),503);
     }
 
-    /**
-     * Stream File Download
-     *
-     * @param string $file_identifier
-     * @param string $mime_type
-     * @param string $original_name
-     * @return void
-     */
-    public function get_download_stream( string $file_identifier, string $mime_type = 'application/octet-stream', string $original_name = '' ) {
-        $clean_key   = ltrim( sanitize_text_field( $file_identifier ), '/\\' );
-        $target_path = $this->get_protected_base_dir() . '/' . $clean_key;
-
-        $real_target = realpath( $target_path );
-        $real_base   = realpath( $this->get_protected_base_dir() );
-
-        if ( ! $real_target || ! $real_base || strpos( $real_target, $real_base ) !== 0 || ! file_exists( $real_target ) ) {
-            status_header( 404 );
-            wp_die( esc_html__( 'İstenen dosya bulunamadı.', 'gnn-filehub' ) );
-        }
-
-        $download_name = ! empty( $original_name ) ? $original_name : basename( $real_target );
-
-        if ( ob_get_level() ) {
-            ob_end_clean();
-        }
-
-        header( 'Content-Description: File Transfer' );
-        header( 'Content-Type: ' . $mime_type );
-        header( 'Content-Disposition: attachment; filename="' . rawurlencode( $download_name ) . '"' );
-        header( 'Expires: 0' );
-        header( 'Cache-Control: must-revalidate' );
-        header( 'Pragma: public' );
-        header( 'Content-Length: ' . filesize( $real_target ) );
-
-        readfile( $real_target );
-        exit;
+    public function get_download_stream( string $file_identifier, string $mime_type='application/octet-stream', string $original_name='' ) {
+        $path=$this->resolve($file_identifier);
+        if(is_wp_error($path))$path=$this->migrate_key($file_identifier);
+        return is_wp_error($path) ? $path : FileHub_Security::stream_file($path,$mime_type,$original_name?:basename($path));
     }
 
-    /**
-     * Get REST Proxy Download URL
-     *
-     * @param string $file_identifier
-     * @return string
-     */
-    public function get_file_url( string $file_identifier ): string {
-        return rest_url( 'filehub/v1/download/' . urlencode( $file_identifier ) );
-    }
+    public function get_file_url( string $file_identifier ): string { return FileHub_Security::download_url_for_key('local',$file_identifier); }
 }

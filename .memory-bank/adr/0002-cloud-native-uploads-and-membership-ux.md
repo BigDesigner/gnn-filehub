@@ -1,8 +1,13 @@
 # ADR 0002: Cloud-Native Streamed Uploads, Per-Tab Settings Isolation, and Member-Facing UX
 
-- **Status**: Accepted
+> [!WARNING]
+> **SUPERSEDED ARCHITECTURAL DECISION**
+> Superseded on 2026-10-25 by [ADR-0003](0003-private-storage-and-transactional-uploads.md). Refer to that record for active architecture and migration guidance.
+
+- **Status**: Superseded by [ADR-0003](0003-private-storage-and-transactional-uploads.md)
 - **Confidence**: Verified
 - **Date**: 2026-08-03
+- **Superseded By**: [ADR-0003](0003-private-storage-and-transactional-uploads.md)
 
 ## Context
 Following the initial zero-dependency build (ADR 0001), real-world usage on the plugin

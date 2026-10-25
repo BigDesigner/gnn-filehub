@@ -1,375 +1,91 @@
 <?php
-if ( ! defined( 'ABSPATH' ) ) {
-    exit;
-}
+if ( ! defined( 'ABSPATH' ) ) { exit; }
 
-require_once GNN_FILEHUB_PATH . 'inc/storage/class-storage-interface.php';
-require_once GNN_FILEHUB_PATH . 'inc/class-filehub-attachment.php';
-
-/**
- * Class FileHub_Storage_R2
- * Cloudflare R2 S3 SigV4 Storage driver. Uploads/downloads stream directly to/from disk
- * (raw cURL, falling back to WP_Http) instead of buffering whole files in PHP memory, so
- * memory usage stays flat regardless of file size.
- */
+/** Bounded native-HTTP multipart transfer. No reusable client PUT credentials are issued. */
 class FileHub_Storage_R2 implements FileHub_Storage_Interface {
-
-    private $account_id;
-    private $access_key;
-    private $secret_key;
-    private $bucket;
-    private $region = 'auto';
-
-    public function __construct( string $account_id = '', string $access_key = '', string $secret_key = '', string $bucket = '' ) {
-        $this->account_id = $account_id ?: get_option( 'filehub_r2_account_id', '' );
-        $this->access_key = $access_key ?: get_option( 'filehub_r2_access_key', '' );
-        $this->secret_key = $secret_key ?: get_option( 'filehub_r2_secret_key', '' );
-        $this->bucket     = $bucket     ?: get_option( 'filehub_r2_bucket', '' );
+    private $account_id, $access_key, $secret_key, $bucket;
+    public function __construct(string $account_id='',string $access_key='',string $secret_key='',string $bucket='') {
+        $this->account_id=$account_id?:get_option('filehub_r2_account_id','');
+        $this->access_key=$access_key?:get_option('filehub_r2_access_key','');
+        $this->secret_key=$secret_key?:get_option('filehub_r2_secret_key','');
+        $this->bucket=$bucket?:get_option('filehub_r2_bucket','');
     }
-
-    /**
-     * Get Endpoint Hostname
-     */
-    private function get_host(): string {
-        return sprintf( '%s.r2.cloudflarestorage.com', $this->account_id );
+    private function request(string $method,string $key,array $query=array(),string $body='',array $extra=array(),array $transport=array()) {
+        if(!preg_match('/^[a-f0-9]{32}$/D',$this->account_id) || !$this->access_key || !$this->secret_key || !preg_match('/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/D',$this->bucket))return FileHub_Security::error(__('Cloudflare R2 ayarları geçersiz.','gnn-filehub'),503);
+        $host=$this->account_id.'.r2.cloudflarestorage.com';
+        $uri='/'.rawurlencode($this->bucket).'/'.implode('/',array_map('rawurlencode',explode('/',ltrim($key,'/'))));
+        ksort($query); $qs=http_build_query($query,'','&',PHP_QUERY_RFC3986);
+        $date=gmdate('Ymd'); $amz=gmdate('Ymd\THis\Z'); $hash=hash('sha256',$body);
+        $headers=array('host'=>$host,'x-amz-content-sha256'=>$hash,'x-amz-date'=>$amz);
+        foreach($extra as $k=>$v)$headers[strtolower($k)]=$v;
+        ksort($headers); $canonical='';
+        foreach($headers as $k=>$v)$canonical.=$k.':'.trim($v)."\n";
+        $signed=implode(';',array_keys($headers));
+        $scope=$date.'/auto/s3/aws4_request';
+        $canonical_request=implode("\n",array($method,$uri,$qs,$canonical,$signed,$hash));
+        $signing=hash_hmac('sha256','aws4_request',hash_hmac('sha256','s3',hash_hmac('sha256','auto',hash_hmac('sha256',$date,'AWS4'.$this->secret_key,true),true),true),true);
+        $signature=hash_hmac('sha256',"AWS4-HMAC-SHA256\n".$amz."\n".$scope."\n".hash('sha256',$canonical_request),$signing);
+        $headers['Authorization']='AWS4-HMAC-SHA256 Credential='.$this->access_key.'/'.$scope.', SignedHeaders='.$signed.', Signature='.$signature;
+        return wp_remote_request('https://'.$host.$uri.($qs!==''?'?'.$qs:''),array_merge(array('method'=>$method,'headers'=>$headers,'body'=>$body,'timeout'=>60,'redirection'=>0),$transport));
     }
-
-    /**
-     * Sign AWS SigV4 Headers
-     */
-    private function get_sigv4_headers( string $method, string $uri, string $payload_hash, array $extra_headers = array() ): array {
-        $host       = $this->get_host();
-        $service    = 's3';
-        $region     = $this->region;
-        $amz_date   = gmdate( 'Ymd\THis\Z' );
-        $date_stamp = gmdate( 'Ymd' );
-
-        $canonical_headers = "host:" . $host . "\n" . "x-amz-content-sha256:" . $payload_hash . "\n" . "x-amz-date:" . $amz_date . "\n";
-        $signed_headers    = "host;x-amz-content-sha256;x-amz-date";
-
-        $canonical_request = implode( "\n", array(
-            $method,
-            $uri,
-            '', // Canonical query string
-            $canonical_headers,
-            $signed_headers,
-            $payload_hash,
-        ) );
-
-        $credential_scope = $date_stamp . '/' . $region . '/' . $service . '/aws4_request';
-        $string_to_sign   = implode( "\n", array(
-            'AWS4-HMAC-SHA256',
-            $amz_date,
-            $credential_scope,
-            hash( 'sha256', $canonical_request ),
-        ) );
-
-        $k_date    = hash_hmac( 'sha256', $date_stamp, 'AWS4' . $this->secret_key, true );
-        $k_region  = hash_hmac( 'sha256', $region, $k_date, true );
-        $k_service = hash_hmac( 'sha256', $service, $k_region, true );
-        $k_signing = hash_hmac( 'sha256', 'aws4_request', $k_service, true );
-        $signature = hash_hmac( 'sha256', $string_to_sign, $k_signing );
-
-        $authorization = sprintf(
-            'AWS4-HMAC-SHA256 Credential=%s/%s, SignedHeaders=%s, Signature=%s',
-            $this->access_key,
-            $credential_scope,
-            $signed_headers,
-            $signature
-        );
-
-        return array_merge( $extra_headers, array(
-            'Host'                 => $host,
-            'x-amz-date'           => $amz_date,
-            'x-amz-content-sha256' => $payload_hash,
-            'Authorization'        => $authorization,
-        ) );
+    public function get_presigned_upload_url(string $filename,int $user_id,int $expires_seconds=3600) { return FileHub_Security::error(__('Doğrudan yükleme kaldırıldı; güvenli yükleme oturumu kullanın.','gnn-filehub'),410); }
+    public function upload_file(array $file,int $user_id) { return FileHub_Security::error(__('Güvenli yükleme oturumu gereklidir.','gnn-filehub'),410); }
+    public function verify_uploaded_object(string $key) {
+        $r=$this->request('HEAD',$key); if(is_wp_error($r))return $r;
+        if(wp_remote_retrieve_response_code($r)!==200)return FileHub_Security::error(__('Bulut dosyası doğrulanamadı.','gnn-filehub'),502);
+        return array('file_size'=>(int)wp_remote_retrieve_header($r,'content-length'),'content_type'=>(string)wp_remote_retrieve_header($r,'content-type'));
     }
-
-    /**
-     * Build a Presigned PUT URL (Query-String SigV4) for Direct Browser → R2 Upload
-     * Unlike the header-based signing used elsewhere in this class, a presigned URL embeds the
-     * signature in the query string so the browser can PUT the file straight to R2 with a plain
-     * fetch() — the file never passes through our own PHP server at all, which is how large
-     * files stay fast and don't hit PHP's memory/execution-time limits.
-     */
-    private function get_presigned_put_url( string $uri, int $expires_seconds = 3600 ): string {
-        $host              = $this->get_host();
-        $service           = 's3';
-        $region            = $this->region;
-        $amz_date          = gmdate( 'Ymd\THis\Z' );
-        $date_stamp        = gmdate( 'Ymd' );
-        $credential_scope  = $date_stamp . '/' . $region . '/' . $service . '/aws4_request';
-
-        $query_params = array(
-            'X-Amz-Algorithm'     => 'AWS4-HMAC-SHA256',
-            'X-Amz-Credential'    => $this->access_key . '/' . $credential_scope,
-            'X-Amz-Date'          => $amz_date,
-            'X-Amz-Expires'       => (string) $expires_seconds,
-            'X-Amz-SignedHeaders' => 'host',
-        );
-        ksort( $query_params );
-        $canonical_query_string = http_build_query( $query_params, '', '&', PHP_QUERY_RFC3986 );
-
-        $canonical_headers = 'host:' . $host . "\n";
-        $signed_headers    = 'host';
-        // Browser-uploaded presigned PUTs can't be content-hashed ahead of time.
-        $payload_hash      = 'UNSIGNED-PAYLOAD';
-
-        $canonical_request = implode( "\n", array(
-            'PUT',
-            $uri,
-            $canonical_query_string,
-            $canonical_headers,
-            $signed_headers,
-            $payload_hash,
-        ) );
-
-        $string_to_sign = implode( "\n", array(
-            'AWS4-HMAC-SHA256',
-            $amz_date,
-            $credential_scope,
-            hash( 'sha256', $canonical_request ),
-        ) );
-
-        $k_date    = hash_hmac( 'sha256', $date_stamp, 'AWS4' . $this->secret_key, true );
-        $k_region  = hash_hmac( 'sha256', $region, $k_date, true );
-        $k_service = hash_hmac( 'sha256', $service, $k_region, true );
-        $k_signing = hash_hmac( 'sha256', 'aws4_request', $k_service, true );
-        $signature = hash_hmac( 'sha256', $string_to_sign, $k_signing );
-
-        return 'https://' . $host . $uri . '?' . $canonical_query_string . '&X-Amz-Signature=' . $signature;
+    public function transfer_step(string $path,array $session) {
+        $t=$session['transfer']??array();
+        if(!$t) {
+            $key='uploads/'.$session['owner'].'/'.$session['id'];
+            $r=$this->request('POST',$key,array('uploads'=>''),'',array('Content-Type'=>$session['mime']));
+            if(is_wp_error($r))return $r;
+            $xml=@simplexml_load_string(wp_remote_retrieve_body($r),'SimpleXMLElement',LIBXML_NONET);
+            if(wp_remote_retrieve_response_code($r)!==200 || !$xml || empty($xml->UploadId))return FileHub_Security::error(__('R2 aktarımı başlatılamadı.','gnn-filehub'),502);
+            return array('transfer'=>array('key'=>$key,'upload_id'=>(string)$xml->UploadId,'offset'=>0,'parts'=>array()));
+        }
+        if($t['offset']<$session['size']) {
+            $fp=@fopen($path,'rb');
+            if(!$fp)return FileHub_Security::error(__('Geçici dosya okunamadı.','gnn-filehub'),500);
+            $ok=fseek($fp,$t['offset'])===0; $data=$ok?fread($fp,min(8*MB_IN_BYTES,$session['size']-$t['offset'])):false; fclose($fp);
+            if(false===$data || strlen($data)!==min(8*MB_IN_BYTES,$session['size']-$t['offset']))return FileHub_Security::error(__('Geçici dosya eksik.','gnn-filehub'),500);
+            $part=count($t['parts'])+1;
+            $r=$this->request('PUT',$t['key'],array('partNumber'=>$part,'uploadId'=>$t['upload_id']),$data);
+            if(is_wp_error($r))return $r;
+            $etag=(string)wp_remote_retrieve_header($r,'etag');
+            if(wp_remote_retrieve_response_code($r)!==200 || !$etag)return FileHub_Security::error(__('R2 parçası kaydedilemedi; yeniden denenebilir.','gnn-filehub'),502);
+            $t['parts'][]=$etag; $t['offset']+=strlen($data);
+            return array('transfer'=>$t);
+        }
+        $xml='<CompleteMultipartUpload>';
+        foreach($t['parts'] as $i=>$etag)$xml.='<Part><PartNumber>'.($i+1).'</PartNumber><ETag>'.htmlspecialchars($etag,ENT_XML1|ENT_QUOTES,'UTF-8').'</ETag></Part>';
+        $xml.='</CompleteMultipartUpload>';
+        $r=$this->request('POST',$t['key'],array('uploadId'=>$t['upload_id']),$xml,array('Content-Type'=>'application/xml'));
+        // HEAD also reconciles a successful completion whose HTTP response was lost.
+        $meta=$this->verify_uploaded_object($t['key']);
+        if(is_wp_error($meta) || $meta['file_size']!==$session['size'])return is_wp_error($r)?$r:FileHub_Security::error(__('R2 tamamlanması doğrulanamadı.','gnn-filehub'),502);
+        return array('transfer'=>$t,'result'=>array('storage_driver'=>'r2','storage_key'=>$t['key'],'file_name'=>$session['filename'],'file_size'=>$meta['file_size']));
     }
-
-    /**
-     * Get a Presigned Upload URL for a New Object (Direct Browser Upload)
-     *
-     * @return array{upload_url:string,key:string}|WP_Error
-     */
-    public function get_presigned_upload_url( string $filename, int $user_id, int $expires_seconds = 3600 ) {
-        if ( empty( $this->account_id ) || empty( $this->access_key ) || empty( $this->secret_key ) || empty( $this->bucket ) ) {
-            return new WP_Error( 'filehub_r2_config_missing', __( 'Cloudflare R2 API bilgileri eksik.', 'gnn-filehub' ) );
-        }
-
-        $r2_key = 'uploads/' . $user_id . '/' . time() . '-' . $filename;
-        $uri    = '/' . $this->bucket . '/' . $r2_key;
-
-        return array(
-            'upload_url' => $this->get_presigned_put_url( $uri, $expires_seconds ),
-            'key'        => $r2_key,
-        );
+    public function abort_transfer(array $t) {
+        $r=$this->request('DELETE',$t['key'],array('uploadId'=>$t['upload_id']));
+        if(is_wp_error($r))return $r;
+        $code=wp_remote_retrieve_response_code($r);
+        if(!in_array($code,array(200,204,404),true))return FileHub_Security::error(__('R2 oturumu iptal edilemedi.','gnn-filehub'),502);
+        return $this->delete_file($t['key']);
     }
-
-    /**
-     * Confirm an Object Was Actually Uploaded & Read Back its Real Size
-     * Called after a direct browser upload finishes, before we trust the client's word for it —
-     * quota accounting and the attachment record use this server-verified size, not whatever
-     * the browser claimed before the upload started.
-     *
-     * @return array{file_size:int,content_type:string}|WP_Error
-     */
-    public function verify_uploaded_object( string $key ) {
-        if ( empty( $this->account_id ) || empty( $this->access_key ) || empty( $this->secret_key ) || empty( $this->bucket ) ) {
-            return new WP_Error( 'filehub_r2_config_missing', __( 'Cloudflare R2 API bilgileri eksik.', 'gnn-filehub' ) );
-        }
-
-        $uri          = '/' . $this->bucket . '/' . ltrim( $key, '/' );
-        $payload_hash = hash( 'sha256', '' );
-        $headers      = $this->get_sigv4_headers( 'HEAD', $uri, $payload_hash );
-        $url          = 'https://' . $this->get_host() . $uri;
-
-        $response = wp_remote_request( $url, array(
-            'method'  => 'HEAD',
-            'headers' => $headers,
-            'timeout' => 30,
-        ) );
-
-        if ( is_wp_error( $response ) ) {
-            return $response;
-        }
-
-        if ( wp_remote_retrieve_response_code( $response ) !== 200 ) {
-            return new WP_Error( 'filehub_r2_object_missing', __( 'Yüklenen dosya R2\'de bulunamadı. CORS ayarlarınızı kontrol edin.', 'gnn-filehub' ) );
-        }
-
-        return array(
-            'file_size'    => (int) wp_remote_retrieve_header( $response, 'content-length' ),
-            'content_type' => wp_remote_retrieve_header( $response, 'content-type' ) ?: 'application/octet-stream',
-        );
+    public function delete_file(string $file_identifier) {
+        $r=$this->request('DELETE',$file_identifier); if(is_wp_error($r))return $r;
+        return in_array(wp_remote_retrieve_response_code($r),array(200,204,404),true) ? true : FileHub_Security::error(__('R2 dosyası silinemedi.','gnn-filehub'),502);
     }
-
-    /**
-     * Upload File to Cloudflare R2
-     */
-    public function upload_file( array $file, int $user_id ) {
-        if ( empty( $this->account_id ) || empty( $this->access_key ) || empty( $this->secret_key ) || empty( $this->bucket ) ) {
-            return new WP_Error( 'filehub_r2_config_missing', __( 'Cloudflare R2 API bilgileri eksik.', 'gnn-filehub' ) );
-        }
-
-        $filename     = FileHub_Attachment::sanitize_upload_filename( $file['name'] );
-        $r2_key       = 'uploads/' . $user_id . '/' . time() . '-' . $filename;
-        $uri          = '/' . $this->bucket . '/' . $r2_key;
-        $file_size    = filesize( $file['tmp_name'] );
-        // hash_file() streams the file internally instead of loading it into a PHP string.
-        $payload_hash = hash_file( 'sha256', $file['tmp_name'] );
-
-        $headers = $this->get_sigv4_headers( 'PUT', $uri, $payload_hash, array(
-            'Content-Type'   => $file['type'] ?: 'application/octet-stream',
-            'Content-Length' => (string) $file_size,
-        ) );
-
-        $url    = 'https://' . $this->get_host() . $uri;
-        $result = $this->send_streamed_put( $url, $headers, $file['tmp_name'] );
-
-        if ( is_wp_error( $result ) ) {
-            return $result;
-        }
-
-        if ( $result['status'] < 200 || $result['status'] >= 300 ) {
-            return new WP_Error(
-                'filehub_r2_upload_failed',
-                sprintf(
-                    /* translators: %d: HTTP status code returned by R2 */
-                    __( 'Cloudflare R2 yükleme hatası: HTTP %d', 'gnn-filehub' ),
-                    $result['status']
-                )
-            );
-        }
-
-        return array(
-            'storage_driver' => 'r2',
-            'storage_key'    => $r2_key,
-            'file_name'      => $filename,
-            'file_size'      => $file_size,
-        );
+    public function get_download_stream(string $file_identifier,string $mime_type='application/octet-stream',string $original_name='') {
+        $root=FileHub_Security::private_dir(); if(is_wp_error($root))return $root;
+        $meta=$this->verify_uploaded_object($file_identifier); if(is_wp_error($meta))return $meta;
+        $slot=FileHub_Uploads::reserve_download($meta['file_size']); if(is_wp_error($slot))return $slot;
+        $tmp=$slot['path'];
+        $r=$this->request('GET',$file_identifier,array(),'',array(),array('stream'=>true,'filename'=>$tmp,'timeout'=>300,'limit_response_size'=>$meta['file_size']+1));
+        if(is_wp_error($r) || wp_remote_retrieve_response_code($r)!==200 || !is_file($tmp) || filesize($tmp)!==$meta['file_size']) { @unlink($tmp); return FileHub_Security::error(__('Bulut dosyası indirilemedi.','gnn-filehub'),502); }
+        return FileHub_Security::stream_file($tmp,$mime_type,$original_name?:basename($file_identifier),true);
     }
-
-    /**
-     * Stream a File to a URL via PUT Without Buffering it in PHP Memory
-     * Uses raw cURL (CURLOPT_INFILE) so curl reads straight from disk in its own internal
-     * chunks. Falls back to loading the file into memory only if the curl extension is
-     * unavailable, which is rare on any real WordPress host.
-     *
-     * @return array{status:int,body:string}|WP_Error
-     */
-    private function send_streamed_put( string $url, array $headers, string $file_path ) {
-        if ( ! function_exists( 'curl_init' ) ) {
-            $response = wp_remote_request( $url, array(
-                'method'  => 'PUT',
-                'headers' => $headers,
-                'body'    => file_get_contents( $file_path ),
-                'timeout' => 300,
-            ) );
-
-            if ( is_wp_error( $response ) ) {
-                return $response;
-            }
-
-            return array(
-                'status' => wp_remote_retrieve_response_code( $response ),
-                'body'   => wp_remote_retrieve_body( $response ),
-            );
-        }
-
-        $fp = fopen( $file_path, 'rb' );
-        if ( ! $fp ) {
-            return new WP_Error( 'filehub_r2_read_failed', __( 'Yüklenecek dosya okunamadı.', 'gnn-filehub' ) );
-        }
-
-        $header_lines = array();
-        foreach ( $headers as $key => $value ) {
-            $header_lines[] = $key . ': ' . $value;
-        }
-
-        $ch = curl_init( $url );
-        curl_setopt_array( $ch, array(
-            CURLOPT_PUT            => true,
-            CURLOPT_INFILE         => $fp,
-            CURLOPT_INFILESIZE     => filesize( $file_path ),
-            CURLOPT_HTTPHEADER     => $header_lines,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 0, // large files can legitimately take a while
-            CURLOPT_SSL_VERIFYPEER => true,
-        ) );
-
-        $body       = curl_exec( $ch );
-        $status     = (int) curl_getinfo( $ch, CURLINFO_HTTP_CODE );
-        $curl_error = curl_error( $ch );
-        curl_close( $ch );
-        fclose( $fp );
-
-        if ( false === $body ) {
-            return new WP_Error( 'filehub_r2_curl_failed', $curl_error ?: __( 'Bağlantı hatası.', 'gnn-filehub' ) );
-        }
-
-        return array( 'status' => $status, 'body' => $body );
-    }
-
-    /**
-     * Delete File from Cloudflare R2
-     */
-    public function delete_file( string $file_identifier ) {
-        $uri          = '/' . $this->bucket . '/' . ltrim( $file_identifier, '/' );
-        $payload_hash = hash( 'sha256', '' );
-        $headers      = $this->get_sigv4_headers( 'DELETE', $uri, $payload_hash );
-        $url          = 'https://' . $this->get_host() . $uri;
-
-        $response = wp_remote_request( $url, array(
-            'method'  => 'DELETE',
-            'headers' => $headers,
-            'timeout' => 30,
-        ) );
-
-        return ! is_wp_error( $response );
-    }
-
-    /**
-     * Download Stream from R2
-     * Downloads to a temp file first instead of loading the whole body into a PHP string, so
-     * memory usage stays flat for large files.
-     */
-    public function get_download_stream( string $file_identifier, string $mime_type = 'application/octet-stream', string $original_name = '' ) {
-        $uri          = '/' . $this->bucket . '/' . ltrim( $file_identifier, '/' );
-        $payload_hash = hash( 'sha256', '' );
-        $headers      = $this->get_sigv4_headers( 'GET', $uri, $payload_hash );
-        $url          = 'https://' . $this->get_host() . $uri;
-
-        $tmp_path = wp_tempnam( 'filehub-r2-download' );
-
-        $response = wp_remote_request( $url, array(
-            'method'   => 'GET',
-            'headers'  => $headers,
-            'timeout'  => 120,
-            'stream'   => true,
-            'filename' => $tmp_path,
-        ) );
-
-        if ( is_wp_error( $response ) || wp_remote_retrieve_response_code( $response ) !== 200 ) {
-            @unlink( $tmp_path );
-            status_header( 404 );
-            wp_die( esc_html__( 'Bulut dosyası indirilemedi.', 'gnn-filehub' ) );
-        }
-
-        $download_name = ! empty( $original_name ) ? $original_name : basename( $file_identifier );
-
-        if ( ob_get_level() ) {
-            ob_end_clean();
-        }
-
-        header( 'Content-Description: File Transfer' );
-        header( 'Content-Type: ' . $mime_type );
-        header( 'Content-Disposition: attachment; filename="' . rawurlencode( $download_name ) . '"' );
-        header( 'Expires: 0' );
-        header( 'Cache-Control: must-revalidate' );
-        header( 'Pragma: public' );
-        header( 'Content-Length: ' . filesize( $tmp_path ) );
-
-        readfile( $tmp_path );
-        @unlink( $tmp_path );
-        exit;
-    }
-
-    public function get_file_url( string $file_identifier ): string {
-        return rest_url( 'filehub/v1/download/' . urlencode( $file_identifier ) );
-    }
+    public function get_file_url(string $file_identifier): string { return FileHub_Security::download_url_for_key('r2',$file_identifier); }
 }
