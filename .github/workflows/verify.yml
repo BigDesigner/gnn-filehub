@@ -19,6 +19,8 @@ jobs:
             wordpress: 'latest'
           - php: '8.4'
             wordpress: 'latest'
+          - php: '8.5'
+            wordpress: 'latest'
     services:
       mysql:
         image: mysql:8.0
@@ -41,7 +43,7 @@ jobs:
           coverage: none
       - uses: actions/setup-node@v7
         with:
-          node-version: '22'
+          node-version: '24'
           package-manager-cache: false
       - name: Syntax and release consistency
         run: |

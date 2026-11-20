@@ -56,7 +56,7 @@ class FileHub_Core {
      * Register Core Hooks & Subsystems
      */
     private function init_hooks() {
-        add_action('init',function(){load_plugin_textdomain('gnn-filehub',false,dirname(plugin_basename(GNN_FILEHUB_FILE)).'/languages');},0);
+        add_action('init',function(){load_plugin_textdomain('gnn-filehub',false,dirname(plugin_basename(GNN_FILEHUB_FILE)).'/languages');},1);
         new FileHub_Lifecycle();
         new FileHub_Updater();
 
@@ -90,6 +90,18 @@ class FileHub_Core {
     }
 
     /**
+     * Resolve the Assigned Account Page URL Safely
+     */
+    private function get_account_page_url(): string {
+        $account_page_id = (int) get_option( 'filehub_page_account', 0 );
+        if ( $account_page_id <= 0 || 'publish' !== get_post_status( $account_page_id ) ) {
+            return '';
+        }
+        $url = get_permalink( $account_page_id );
+        return is_string( $url ) ? $url : '';
+    }
+
+    /**
      * Block wp-admin Dashboard Access for Members Without edit_posts
      * Sends them back to the front-end account page instead of ever showing them wp-admin.
      */
@@ -99,8 +111,8 @@ class FileHub_Core {
         }
 
         if ( is_user_logged_in() && ! current_user_can( 'edit_posts' ) ) {
-            $account_page_id = (int) get_option( 'filehub_page_account', 0 );
-            wp_safe_redirect( $account_page_id ? get_permalink( $account_page_id ) : home_url() );
+            $url = $this->get_account_page_url();
+            wp_safe_redirect( $url ?: home_url() );
             exit;
         }
     }
@@ -120,17 +132,17 @@ class FileHub_Core {
             return;
         }
 
-        $action = isset( $_GET['action'] ) ? sanitize_text_field( wp_unslash( $_GET['action'] ) ) : 'login';
+        $action = isset( $_GET['action'] ) && is_string( $_GET['action'] ) ? sanitize_text_field( wp_unslash( $_GET['action'] ) ) : 'login';
         if ( 'login' !== $action ) {
             return;
         }
 
-        $account_page_id = (int) get_option( 'filehub_page_account', 0 );
-        if ( ! $account_page_id ) {
+        $url = $this->get_account_page_url();
+        if ( ! $url ) {
             return;
         }
 
-        wp_safe_redirect( get_permalink( $account_page_id ) );
+        wp_safe_redirect( $url );
         exit;
     }
 
@@ -138,12 +150,11 @@ class FileHub_Core {
      * Point wp_login_url() at the Front-End Account Page (Logged-Out State) When Available
      */
     public function filter_login_url( $login_url, $redirect ) {
-        $account_page_id = (int) get_option( 'filehub_page_account', 0 );
-        if ( ! $account_page_id ) {
+        $url = $this->get_account_page_url();
+        if ( ! $url ) {
             return $login_url;
         }
 
-        $url = get_permalink( $account_page_id );
         if ( $redirect ) {
             $url = add_query_arg( 'redirect_to', $redirect, $url );
         }
@@ -155,8 +166,8 @@ class FileHub_Core {
      * Point wp_registration_url() at the Front-End Account Page When Available
      */
     public function filter_register_url( $register_url ) {
-        $account_page_id = (int) get_option( 'filehub_page_account', 0 );
-        return $account_page_id ? get_permalink( $account_page_id ) : $register_url;
+        $url = $this->get_account_page_url();
+        return $url ?: $register_url;
     }
 
     /**

@@ -5,6 +5,9 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
+msgid "%%%s Dolu"
+msgstr ""
+
 msgid "%d eksik sayfa otomatik olarak oluşturuldu ve atandı."
 msgstr ""
 
@@ -128,6 +131,9 @@ msgstr ""
 msgid "Bu işlem için yetkiniz yok."
 msgstr ""
 
+msgid "Bu kullanıcı için özel depolama limiti (MB). Boş bırakılırsa veya 0 yazılırsa varsayılan kota (%s) kullanılır."
+msgstr ""
+
 msgid "Bu sayfayı görüntüleme yetkiniz yok."
 msgstr ""
 
@@ -150,6 +156,12 @@ msgid "Check Updates"
 msgstr ""
 
 msgid "Client ID / Secret / Klasör ID Kaydet"
+msgstr ""
+
+msgid "Cloudflare R2 (S3)"
+msgstr ""
+
+msgid "Cloudflare R2 API Bilgileri"
 msgstr ""
 
 msgid "Cloudflare R2 ayarları geçersiz."
@@ -341,6 +353,9 @@ msgstr ""
 msgid "Finfo ile içerik doğrulaması her yüklemede zorunludur. Bu bir virüs taraması değildir."
 msgstr ""
 
+msgid "GNN FileHub Depolama Ayarları"
+msgstr ""
+
 msgid "GNN Filehub - Ayarlar"
 msgstr ""
 
@@ -468,6 +483,12 @@ msgid "Google Cloud Console'daki OAuth istemcinizin \"Authorized redirect URIs\"
 msgstr ""
 
 msgid "Google Drive API bilgileri eksik."
+msgstr ""
+
+msgid "Google Drive API v3"
+msgstr ""
+
+msgid "Google Drive API v3 Bilgileri"
 msgstr ""
 
 msgid "Google Drive hesabınız bağlı."
@@ -632,6 +653,9 @@ msgstr ""
 msgid "Lütfen geçerli bir .json dosyası yükleyin."
 msgstr ""
 
+msgid "Mevcut Kullanım:"
+msgstr ""
+
 msgid "Mevcut Şifre"
 msgstr ""
 
@@ -645,6 +669,9 @@ msgid "Misafir Yükleme İzni"
 msgstr ""
 
 msgid "Misafirler ortak misafir kotasını kullanır; dosyalarını yalnızca yöneticiler indirebilir."
+msgstr ""
+
+msgid "OAuth2 ile Google Drive depolaması."
 msgstr ""
 
 msgid "Office belgeleri için PHP Zip etkinleştirilmelidir."
@@ -696,6 +723,9 @@ msgid "R2 parçası kaydedilemedi; yeniden denenebilir."
 msgstr ""
 
 msgid "R2 tamamlanması doğrulanamadı."
+msgstr ""
+
+msgid "S3 SigV4 ile özel nesne depolaması."
 msgstr ""
 
 msgid "Sadece yöneticilerin erişebildiği, tüm üyelerin yüklediği dosyaları listeleyen sayfa."
@@ -800,6 +830,9 @@ msgstr ""
 msgid "Web kökü dışında özel depolama oluşturulamadı. GNN_FILEHUB_PRIVATE_DIR yapılandırılmalı."
 msgstr ""
 
+msgid "Web kökü dışında özel sunucu depolaması."
+msgstr ""
+
 msgid "Yalnızca FileHub tarafından izlenen kullanım; bucket kapasitesi değildir."
 msgstr ""
 
@@ -828,6 +861,9 @@ msgid "Yeniden Bağlan"
 msgstr ""
 
 msgid "Yeniden dene"
+msgstr ""
+
+msgid "Yerel Korumalı Depolama"
 msgstr ""
 
 msgid "Yüklediğim Dosyalar"
@@ -921,6 +957,9 @@ msgid "Önizle"
 msgstr ""
 
 msgid "Önizleme yalnızca 8 MB altındaki resim ve PDF dosyaları için kullanılabilir."
+msgstr ""
+
+msgid "Özel Depolama Kotası (MB)"
 msgstr ""
 
 msgid "Özel depolama bulunamadı."

@@ -216,6 +216,15 @@ class FileHub_REST_API extends WP_REST_Controller {
             $hash=get_user_meta($id,'_filehub_email_token',true);
             if(!is_string($hash) || !$hash || !hash_equals($hash,hash('sha256',$token)) || (int)get_user_meta($id,'_filehub_email_expires',true)<time())return FileHub_Security::error(__('Doğrulama bağlantısı geçersiz veya süresi dolmuş.','gnn-filehub'));
             delete_user_meta($id,'_filehub_pending_email'); delete_user_meta($id,'_filehub_email_token'); delete_user_meta($id,'_filehub_email_expires');
+            $accept = (string) $request->get_header('accept');
+            $account_page_id = (int) get_option('filehub_page_account', 0);
+            if ($account_page_id > 0 && 'publish' === get_post_status($account_page_id) && strpos($accept, 'text/html') !== false) {
+                $account_url = get_permalink($account_page_id);
+                if (is_string($account_url)) {
+                    wp_safe_redirect(add_query_arg('filehub_verified', '1', $account_url));
+                    exit;
+                }
+            }
             return new WP_REST_Response(array('success'=>true,'message'=>__('E-posta doğrulandı. Hesap sayfasından giriş yapabilirsiniz.','gnn-filehub')),200);
         });
     }

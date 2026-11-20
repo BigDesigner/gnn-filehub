@@ -130,6 +130,11 @@
   background-color: var(--filehub-theme-color);
 }
 
+.filehub-switch input:focus-visible + .filehub-slider {
+  outline: 2px solid var(--filehub-theme-color);
+  outline-offset: 2px;
+}
+
 .filehub-switch input:checked + .filehub-slider:before {
   transform: translateX(20px);
 }
@@ -159,6 +164,11 @@
 .filehub-driver-card.selected {
   border-color: var(--filehub-theme-color);
   background: var(--filehub-bg-elevated);
+}
+
+.filehub-driver-card:has(input:focus-visible) {
+  outline: 2px solid var(--filehub-theme-color);
+  outline-offset: 2px;
 }
 
 .filehub-driver-card input[type="radio"] {

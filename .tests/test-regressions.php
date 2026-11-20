@@ -274,6 +274,29 @@ test_case('R32','Retained trash files still count against real storage quota',fu
     wp_update_post(array('ID'=>$id,'post_status'=>'trash'));
     expect(FileHub_Attachment::get_user_stats($GLOBALS['owner'])['total_bytes']===$before);
 });
+test_case('R33','Chunk size honors upload_max_filesize when post_max_size is zero/unlimited',function() {
+    expect(FileHub_Uploads::chunk_size_from_limits(524288,0)===262144);
+    expect(FileHub_Uploads::chunk_size_from_limits(0,0)===1048576);
+});
+test_case('R34','AVIF extension is permitted in safe extensions allowlist',function() {
+    expect(in_array('avif',FileHub_Security::safe_extensions(),true));
+    expect(sanitize_option('filehub_allowed_extensions','avif,webp,svg')==='avif,webp');
+});
+test_case('R35','Updater exposes WP/PHP compatibility metadata and no_update when current',function() {
+    $u=new FileHub_Updater();
+    $release=(object)array('version'=>GNN_FILEHUB_VERSION,'download_url'=>'https://github.com/BigDesigner/gnn-filehub/releases/download/v'.GNN_FILEHUB_VERSION.'/gnn-filehub-v'.GNN_FILEHUB_VERSION.'.zip','changelog'=>'test','published_at'=>'2026-11-20T00:00:00Z','html_url'=>'https://github.com/BigDesigner/gnn-filehub');
+    set_transient('filehub_github_update_check',$release,300);
+    $slug=plugin_basename(GNN_FILEHUB_FILE);
+    $tr=(object)array('checked'=>array($slug=>GNN_FILEHUB_VERSION));
+    $out=$u->check_for_update($tr);
+    expect(isset($out->no_update[$slug]) && $out->no_update[$slug]->requires==='6.0' && $out->no_update[$slug]->tested==='7.1');
+    $info=$u->plugin_info(false,'plugin_information',(object)array('slug'=>dirname($slug)));
+    expect(is_object($info) && $info->requires==='6.0' && $info->requires_php==='8.0' && $info->tested==='7.1');
+});
+test_case('R36','Non-attachment queries skip FileHub hide_files meta_query join',function() {
+    $q=new WP_Query(array('post_type'=>'post','posts_per_page'=>1));
+    expect(empty($q->query_vars['meta_query']));
+});
 
 update_option('active_plugins',array('gnn-filehub/gnn-filehub-nextgen.php'));
 update_option('template','filehub-qa'); update_option('stylesheet','filehub-qa');

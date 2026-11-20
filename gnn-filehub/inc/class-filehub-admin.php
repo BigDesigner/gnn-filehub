@@ -233,8 +233,7 @@ class FileHub_Admin {
                 if($option==='filehub_strict_mime')return '1';
                 if($option==='filehub_allowed_extensions') {
                     $parts=array_map(function($x){return ltrim(trim(strtolower($x)),'.');},explode(',',(string)$value));
-                    $safe=array('jpg','jpeg','png','gif','webp','pdf','zip','doc','docx','xls','xlsx','ppt','pptx','txt','csv','mp3','mp4');
-                    return implode(',',array_values(array_unique(array_intersect($parts,$safe))));
+                    return implode(',',array_values(array_unique(array_intersect($parts,FileHub_Security::safe_extensions()))));
                 }
                 if($option==='filehub_notify_email')return sanitize_email((string)$value);
                 return $this->sanitize_imported_setting_value($type,$value);
@@ -273,7 +272,7 @@ class FileHub_Admin {
      * Atamaları / Depolama Sürücüleri), since those three are the actual configuration screens.
      */
     public function render_settings_page() {
-        $active_tab = isset( $_GET['tab'] ) ? sanitize_text_field( $_GET['tab'] ) : 'general';
+        $active_tab = isset( $_GET['tab'] ) && is_string( $_GET['tab'] ) ? sanitize_text_field( wp_unslash( $_GET['tab'] ) ) : 'general';
         ?>
         <div class="wrap">
             <h1 class="wp-heading-inline">GNN Filehub — <?php esc_html_e( 'Ayarlar', 'gnn-filehub' ); ?></h1>
@@ -468,7 +467,7 @@ class FileHub_Admin {
      * Handle "Otomatik Sayfa Oluştur" Form Submission
      */
     public function maybe_create_missing_pages() {
-        if ( ! isset( $_POST['filehub_create_pages_nonce'] ) || ! wp_verify_nonce( $_POST['filehub_create_pages_nonce'], 'filehub_create_pages' ) ) {
+        if ( ! isset( $_POST['filehub_create_pages_nonce'] ) || ! is_string( $_POST['filehub_create_pages_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['filehub_create_pages_nonce'] ) ), 'filehub_create_pages' ) ) {
             return;
         }
 
@@ -530,7 +529,7 @@ class FileHub_Admin {
      */
     private function render_tab_pages() {
         ?>
-        <?php if ( isset( $_GET['filehub_pages_created'] ) ) : ?>
+        <?php if ( isset( $_GET['filehub_pages_created'] ) && is_scalar( $_GET['filehub_pages_created'] ) ) : ?>
             <?php $created_count = (int) $_GET['filehub_pages_created']; ?>
             <div class="notice notice-success is-dismissible">
                 <p>
@@ -650,26 +649,26 @@ class FileHub_Admin {
                 <div class="filehub-driver-grid">
                     <label class="filehub-driver-card <?php echo $driver === 'local' ? 'selected' : ''; ?>">
                         <input type="radio" name="filehub_storage_driver" value="local" <?php checked( 'local', $driver ); ?>>
-                        <strong>Yerel Korumalı Depolama</strong>
-                        <p style="margin: 5px 0 0 0; color: #646970; font-size: 0.9em;">Web kökü dışında özel sunucu depolaması.</p>
+                        <strong><?php esc_html_e( 'Yerel Korumalı Depolama', 'gnn-filehub' ); ?></strong>
+                        <p style="margin: 5px 0 0 0; color: #646970; font-size: 0.9em;"><?php esc_html_e( 'Web kökü dışında özel sunucu depolaması.', 'gnn-filehub' ); ?></p>
                     </label>
 
                     <label class="filehub-driver-card <?php echo $driver === 'r2' ? 'selected' : ''; ?>">
                         <input type="radio" name="filehub_storage_driver" value="r2" <?php checked( 'r2', $driver ); ?>>
-                        <strong>Cloudflare R2 (S3)</strong>
-                        <p style="margin: 5px 0 0 0; color: #646970; font-size: 0.9em;">S3 SigV4 ile özel nesne depolaması.</p>
+                        <strong><?php esc_html_e( 'Cloudflare R2 (S3)', 'gnn-filehub' ); ?></strong>
+                        <p style="margin: 5px 0 0 0; color: #646970; font-size: 0.9em;"><?php esc_html_e( 'S3 SigV4 ile özel nesne depolaması.', 'gnn-filehub' ); ?></p>
                     </label>
 
                     <label class="filehub-driver-card <?php echo $driver === 'gdrive' ? 'selected' : ''; ?>">
                         <input type="radio" name="filehub_storage_driver" value="gdrive" <?php checked( 'gdrive', $driver ); ?>>
-                        <strong>Google Drive API v3</strong>
-                        <p style="margin: 5px 0 0 0; color: #646970; font-size: 0.9em;">OAuth2 ile Google Drive depolaması.</p>
+                        <strong><?php esc_html_e( 'Google Drive API v3', 'gnn-filehub' ); ?></strong>
+                        <p style="margin: 5px 0 0 0; color: #646970; font-size: 0.9em;"><?php esc_html_e( 'OAuth2 ile Google Drive depolaması.', 'gnn-filehub' ); ?></p>
                     </label>
                 </div>
             </div>
 
             <div class="filehub-card filehub-storage-panel" data-driver="r2" style="margin-top: 20px; <?php echo $driver !== 'r2' ? 'display:none;' : ''; ?>">
-                <h3>Cloudflare R2 API Bilgileri</h3>
+                <h3><?php esc_html_e( 'Cloudflare R2 API Bilgileri', 'gnn-filehub' ); ?></h3>
                 <p class="description" style="margin-bottom: 15px;">
                     <?php esc_html_e( 'Dosyalar sunucuda içerik kontrolünden geçtikten sonra sınırlı parçalarla R2\'ye aktarılır. Tarayıcı için bucket CORS ayarı gerekmez.', 'gnn-filehub' ); ?>
                     <br>
@@ -696,7 +695,7 @@ class FileHub_Admin {
             </div>
 
             <div class="filehub-card filehub-storage-panel" data-driver="gdrive" style="margin-top: 20px; <?php echo $driver !== 'gdrive' ? 'display:none;' : ''; ?>">
-                <h3>Google Drive API v3 Bilgileri</h3>
+                <h3><?php esc_html_e( 'Google Drive API v3 Bilgileri', 'gnn-filehub' ); ?></h3>
 
                 <p class="description" style="margin-bottom: 15px;">
                     <?php esc_html_e( 'Google Cloud Console\'daki OAuth istemcinizin "Authorized redirect URIs" listesine şu adresi ekleyin:', 'gnn-filehub' ); ?>
@@ -729,7 +728,7 @@ class FileHub_Admin {
         $gdrive_refresh_token = get_option( 'filehub_gdrive_refresh_token', '' );
         $gdrive_client_id     = get_option( 'filehub_gdrive_client_id', '' );
         $gdrive_client_secret = get_option( 'filehub_gdrive_client_secret', '' );
-        $gdrive_notice        = isset( $_GET['filehub_gdrive_oauth'] ) ? sanitize_text_field( $_GET['filehub_gdrive_oauth'] ) : '';
+        $gdrive_notice        = isset( $_GET['filehub_gdrive_oauth'] ) && is_string( $_GET['filehub_gdrive_oauth'] ) ? sanitize_text_field( wp_unslash( $_GET['filehub_gdrive_oauth'] ) ) : '';
         ?>
         <div class="filehub-card filehub-storage-panel" data-driver="gdrive" style="margin-top: 20px; <?php echo $driver !== 'gdrive' ? 'display:none;' : ''; ?>">
             <h3><?php esc_html_e( 'Google Bağlantısı', 'gnn-filehub' ); ?></h3>
@@ -752,7 +751,7 @@ class FileHub_Admin {
                                 esc_html_e( 'Google\'a bağlanılamadı, lütfen tekrar deneyin.', 'gnn-filehub' );
                                 break;
                             case 'failed':
-                                $reason = isset( $_GET['filehub_gdrive_oauth_reason'] ) ? sanitize_text_field( wp_unslash( $_GET['filehub_gdrive_oauth_reason'] ) ) : '';
+                                $reason = isset( $_GET['filehub_gdrive_oauth_reason'] ) && is_string( $_GET['filehub_gdrive_oauth_reason'] ) ? sanitize_text_field( wp_unslash( $_GET['filehub_gdrive_oauth_reason'] ) ) : '';
                                 printf(
                                     /* translators: %s: raw error reason returned by Google */
                                     esc_html__( 'Bağlantı başarısız: %s', 'gnn-filehub' ),
@@ -913,7 +912,7 @@ class FileHub_Admin {
         }
 
         update_option( 'filehub_gdrive_refresh_token', $data['refresh_token'] );
-        delete_transient( 'filehub_gdrive_access_token' );
+        delete_transient( 'filehub_gdrive_token_' . substr( FileHub_Security::configuration_hash( 'gdrive' ), 0, 24 ) );
 
         wp_safe_redirect( add_query_arg( array( 'page' => 'filehub-settings', 'tab' => 'storage', 'filehub_gdrive_oauth' => 'connected' ), admin_url( 'admin.php' ) ) );
         exit;
@@ -927,7 +926,7 @@ class FileHub_Admin {
         <div class="filehub-card filehub-manager" style="margin: 20px 0;">
             <div class="filehub-manager-toolbar">
                 <h3 style="margin: 0;"><?php esc_html_e( 'Tüm Üye Dosyaları', 'gnn-filehub' ); ?></h3>
-                <input type="text" class="filehub-search-input" placeholder="<?php esc_attr_e( 'Dosya veya yükleyen ara...', 'gnn-filehub' ); ?>">
+                <input type="text" class="filehub-search-input" aria-label="<?php esc_attr_e( 'Dosya veya yükleyen ara...', 'gnn-filehub' ); ?>" placeholder="<?php esc_attr_e( 'Dosya veya yükleyen ara...', 'gnn-filehub' ); ?>">
             </div>
             <div class="filehub-file-list" data-scope="all">
                 <p><?php esc_html_e( 'Yükleniyor...', 'gnn-filehub' ); ?></p>
@@ -1006,7 +1005,7 @@ class FileHub_Admin {
      * Settings Tab: Bakım (Maintenance) — Export / Import Settings as JSON
      */
     private function render_tab_maintenance() {
-        $import_status = isset( $_GET['filehub_import'] ) ? sanitize_text_field( $_GET['filehub_import'] ) : '';
+        $import_status = isset( $_GET['filehub_import'] ) && is_string( $_GET['filehub_import'] ) ? sanitize_text_field( wp_unslash( $_GET['filehub_import'] ) ) : '';
         ?>
         <?php if ( $import_status ) : ?>
             <div class="notice notice-<?php echo 'success' === $import_status ? 'success' : 'error'; ?> is-dismissible">
@@ -1014,7 +1013,7 @@ class FileHub_Admin {
                     <?php
                     switch ( $import_status ) {
                         case 'success':
-                            $count = isset( $_GET['filehub_import_count'] ) ? (int) $_GET['filehub_import_count'] : 0;
+                            $count = isset( $_GET['filehub_import_count'] ) && is_scalar( $_GET['filehub_import_count'] ) ? (int) $_GET['filehub_import_count'] : 0;
                             printf(
                                 /* translators: %d: number of settings updated */
                                 esc_html__( 'Ayarlar başarıyla içe aktarıldı. %d ayar güncellendi.', 'gnn-filehub' ),
@@ -1190,17 +1189,25 @@ class FileHub_Admin {
 
         $custom_quota_mb = get_user_meta( $user->ID, '_filehub_custom_quota_mb', true );
         $user_stats      = FileHub_Attachment::get_user_stats( $user->ID );
+        $default_mb      = (int) get_option( 'filehub_default_quota_mb', 500 );
+        $default_label   = $default_mb > 0 ? sprintf( '%d MB', $default_mb ) : __( 'Sınırsız', 'gnn-filehub' );
         wp_nonce_field( 'filehub_save_user_quota', 'filehub_user_quota_nonce' );
         ?>
-        <h3>GNN FileHub Depolama Ayarları</h3>
+        <h3><?php esc_html_e( 'GNN FileHub Depolama Ayarları', 'gnn-filehub' ); ?></h3>
         <table class="form-table">
             <tr>
-                <th><label for="filehub_custom_quota_mb">Özel Depolama Kotası (MB)</label></th>
+                <th><label for="filehub_custom_quota_mb"><?php esc_html_e( 'Özel Depolama Kotası (MB)', 'gnn-filehub' ); ?></label></th>
                 <td>
                     <input type="number" name="filehub_custom_quota_mb" id="filehub_custom_quota_mb" value="<?php echo esc_attr( $custom_quota_mb ); ?>" min="0" step="1" class="regular-text" />
                     <p class="description">
-                        Bu kullanıcı için özel depolama limiti (MB). Boş bırakılırsa veya 0 yazılırsa varsayılan kota (500 MB) kullanılır.<br />
-                        <strong>Mevcut Kullanım:</strong> <?php echo esc_html( $user_stats['used_formatted'] ); ?> / <?php echo esc_html( $user_stats['quota_formatted'] ); ?> (%<?php echo esc_html( $user_stats['percentage'] ); ?>)
+                        <?php
+                        printf(
+                            /* translators: %s: default global quota value (e.g. "500 MB" or "Sınırsız") */
+                            esc_html__( 'Bu kullanıcı için özel depolama limiti (MB). Boş bırakılırsa veya 0 yazılırsa varsayılan kota (%s) kullanılır.', 'gnn-filehub' ),
+                            esc_html( $default_label )
+                        );
+                        ?><br />
+                        <strong><?php esc_html_e( 'Mevcut Kullanım:', 'gnn-filehub' ); ?></strong> <?php echo esc_html( $user_stats['used_formatted'] ); ?> / <?php echo esc_html( $user_stats['quota_formatted'] ); ?> (%<?php echo esc_html( $user_stats['percentage'] ); ?>)
                     </p>
                 </td>
             </tr>
@@ -1218,12 +1225,12 @@ class FileHub_Admin {
             return;
         }
 
-        if ( ! isset( $_POST['filehub_user_quota_nonce'] ) || ! wp_verify_nonce( $_POST['filehub_user_quota_nonce'], 'filehub_save_user_quota' ) ) {
+        if ( ! isset( $_POST['filehub_user_quota_nonce'] ) || ! is_string( $_POST['filehub_user_quota_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['filehub_user_quota_nonce'] ) ), 'filehub_save_user_quota' ) ) {
             return;
         }
 
-        if ( isset( $_POST['filehub_custom_quota_mb'] ) ) {
-            $val = sanitize_text_field( $_POST['filehub_custom_quota_mb'] );
+        if ( isset( $_POST['filehub_custom_quota_mb'] ) && is_scalar( $_POST['filehub_custom_quota_mb'] ) ) {
+            $val = sanitize_text_field( wp_unslash( (string) $_POST['filehub_custom_quota_mb'] ) );
             if ( $val === '' || (int) $val <= 0 ) {
                 delete_user_meta( $user_id, '_filehub_custom_quota_mb' );
             } else {

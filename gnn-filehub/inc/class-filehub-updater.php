@@ -30,6 +30,13 @@ class FileHub_Updater {
     private $cache_duration = 43200;
 
     /**
+     * Compatibility Metadata for WP Update & Details API
+     */
+    private $requires_wp  = '6.0';
+    private $requires_php = '8.0';
+    private $tested_up_to = '7.1';
+
+    /**
      * Constructor & Hook Initialization
      */
     public function __construct() {
@@ -51,6 +58,35 @@ class FileHub_Updater {
      */
     private function get_local_version(): string {
         return defined( 'GNN_FILEHUB_VERSION' ) ? GNN_FILEHUB_VERSION : '1.0.0';
+    }
+
+    private function sanitize_github_url( string $url, string $required_prefix ): string {
+        $clean = esc_url_raw( $url, array( 'https' ) );
+        if ( '' === $clean || 0 !== strpos( $clean, $required_prefix ) ) {
+            return '';
+        }
+        $parts = wp_parse_url( $clean );
+        if ( ! is_array( $parts ) || 'https' !== ( $parts['scheme'] ?? '' ) || 'github.com' !== ( $parts['host'] ?? '' ) ) {
+            return '';
+        }
+        return $clean;
+    }
+
+    private function get_package_url( $release_body, string $remote_version ): string {
+        if ( empty( $release_body->assets ) || ! is_array( $release_body->assets ) ) {
+            return '';
+        }
+        $expected_name   = 'gnn-filehub-v' . $remote_version . '.zip';
+        $expected_prefix = 'https://github.com/' . $this->repo . '/releases/download/v' . $remote_version . '/';
+        foreach ( $release_body->assets as $asset ) {
+            if ( isset( $asset->name, $asset->browser_download_url ) && $asset->name === $expected_name ) {
+                $url = $this->sanitize_github_url( (string) $asset->browser_download_url, $expected_prefix );
+                if ( '' !== $url ) {
+                    return $url;
+                }
+            }
+        }
+        return '';
     }
 
     /**
@@ -86,25 +122,19 @@ class FileHub_Updater {
         }
 
         $remote_version = ltrim( $body->tag_name, 'v' );
-        $download_url   = '';
-
-        if ( ! empty( $body->assets ) ) {
-            foreach ( $body->assets as $asset ) {
-                if ( $asset->name === 'gnn-filehub-v' . $remote_version . '.zip' && strpos($asset->browser_download_url, 'https://github.com/' . $this->repo . '/releases/download/v' . $remote_version . '/') === 0 ) {
-                    $download_url = $asset->browser_download_url;
-                    break;
-                }
-            }
-        }
+        $download_url   = $this->get_package_url( $body, $remote_version );
 
         if ( empty( $download_url ) ) { set_transient($this->transient_key,array('failed'=>true),300); return false; }
+
+        $repo_url = 'https://github.com/' . $this->repo;
+        $html_url = isset( $body->html_url ) ? $this->sanitize_github_url( (string) $body->html_url, $repo_url . '/' ) : '';
 
         $release_data = (object) array(
             'version'      => $remote_version,
             'download_url' => $download_url,
-            'changelog'    => isset( $body->body ) ? $body->body : '',
-            'published_at' => isset( $body->published_at ) ? $body->published_at : '',
-            'html_url'     => isset( $body->html_url ) ? $body->html_url : '',
+            'changelog'    => isset( $body->body ) && is_string( $body->body ) ? $body->body : '',
+            'published_at' => isset( $body->published_at ) && is_string( $body->published_at ) ? $body->published_at : '',
+            'html_url'     => $html_url ?: $repo_url,
         );
 
         set_transient( $this->transient_key, $release_data, $this->cache_duration );
@@ -127,15 +157,25 @@ class FileHub_Updater {
 
         $local_version = $this->get_local_version();
 
-        if ( version_compare( $release->version, $local_version, '>' ) ) {
-            $obj              = new stdClass();
-            $obj->slug        = dirname( $this->plugin_slug );
-            $obj->plugin      = $this->plugin_slug;
-            $obj->new_version = $release->version;
-            $obj->url         = $release->html_url;
-            $obj->package     = $release->download_url;
+        $obj               = new stdClass();
+        $obj->slug         = dirname( $this->plugin_slug );
+        $obj->plugin       = $this->plugin_slug;
+        $obj->new_version  = $release->version;
+        $obj->url          = $release->html_url;
+        $obj->requires     = $this->requires_wp;
+        $obj->requires_php = $this->requires_php;
+        $obj->tested       = $this->tested_up_to;
 
+        if ( version_compare( $release->version, $local_version, '>' ) ) {
+            $obj->package = $release->download_url;
             $transient->response[ $this->plugin_slug ] = $obj;
+            if ( isset( $transient->no_update[ $this->plugin_slug ] ) ) {
+                unset( $transient->no_update[ $this->plugin_slug ] );
+            }
+        } else {
+            $obj->new_version = $local_version;
+            $obj->package     = '';
+            $transient->no_update[ $this->plugin_slug ] = $obj;
         }
 
         return $transient;
@@ -162,6 +202,10 @@ class FileHub_Updater {
             'version'       => $release->version,
             'author'        => 'BigDesigner',
             'homepage'      => 'https://gnn.com.tr',
+            'requires'      => $this->requires_wp,
+            'requires_php'  => $this->requires_php,
+            'tested'        => $this->tested_up_to,
+            'last_updated'  => $release->published_at,
             'download_link' => $release->download_url,
             'sections'      => array(
                 'description' => '100% WordPress Core Native, zero-dependency file upload and multi-cloud storage management plugin.',
@@ -182,6 +226,13 @@ class FileHub_Updater {
         if(is_wp_error($source) || ($hook_extra['plugin']??'')!==$this->plugin_slug)return $source;
         global $wp_filesystem;
         if(!$wp_filesystem || !$wp_filesystem->is_file(trailingslashit($source).'gnn-filehub-nextgen.php') || !$wp_filesystem->is_file(trailingslashit($source).'VERSION'))return new WP_Error('filehub_bad_package',__('Güncelleme paketi geçerli bir FileHub paketi değil.','gnn-filehub'));
+        $expected_folder = dirname( $this->plugin_slug );
+        if ( '.' !== $expected_folder && basename( untrailingslashit( $source ) ) !== $expected_folder ) {
+            $corrected = trailingslashit( $remote_source ) . $expected_folder;
+            if ( $wp_filesystem->move( $source, $corrected, true ) ) {
+                return trailingslashit( $corrected );
+            }
+        }
         return $source;
     }
 

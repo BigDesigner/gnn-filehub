@@ -34,7 +34,16 @@ class FileHub_Uploads {
     }
 
     public static function chunk_size(): int {
-        $php_limit = min( wp_convert_hr_to_bytes( ini_get( 'upload_max_filesize' ) ), wp_convert_hr_to_bytes( ini_get( 'post_max_size' ) ) );
+        return self::chunk_size_from_limits(
+            wp_convert_hr_to_bytes( ini_get( 'upload_max_filesize' ) ),
+            wp_convert_hr_to_bytes( ini_get( 'post_max_size' ) )
+        );
+    }
+
+    /** Compute bounded chunk size from raw byte limits (0 = unlimited). */
+    public static function chunk_size_from_limits( int $upload_max, int $post_max ): int {
+        $limits = array_filter( array( $upload_max, $post_max ), function( $bytes ) { return $bytes > 0; } );
+        $php_limit = $limits ? min( $limits ) : 0;
         return max( 16384, min( 1024 * 1024, $php_limit > 0 ? (int) floor( $php_limit / 2 ) : 1024 * 1024 ) );
     }
 

@@ -78,9 +78,11 @@ class FileHub_Shortcodes {
 
         $label = is_user_logged_in() ? __( 'Hesabım', 'gnn-filehub' ) : __( 'Giriş Yap', 'gnn-filehub' );
 
-        $updated = preg_replace(
+        $updated = preg_replace_callback(
             '/(<span class="wp-block-navigation-item__label">)(.*?)(<\/span>)/s',
-            '$1' . esc_html( $label ) . '$3',
+            function( $matches ) use ( $label ) {
+                return $matches[1] . esc_html( $label ) . $matches[3];
+            },
             $block_content,
             1
         );
@@ -243,7 +245,7 @@ class FileHub_Shortcodes {
                 <div class="filehub-card filehub-manager" style="margin-top: 20px;">
                     <div class="filehub-manager-toolbar">
                         <h3><?php esc_html_e( 'Yüklediğim Dosyalar', 'gnn-filehub' ); ?></h3>
-                        <input type="text" class="filehub-search-input" placeholder="<?php esc_attr_e( 'Dosya ara...', 'gnn-filehub' ); ?>">
+                        <input type="text" class="filehub-search-input" aria-label="<?php esc_attr_e( 'Dosya ara...', 'gnn-filehub' ); ?>" placeholder="<?php esc_attr_e( 'Dosya ara...', 'gnn-filehub' ); ?>">
                     </div>
                     <div class="filehub-file-list" data-scope="own">
                         <p><?php esc_html_e( 'Yükleniyor...', 'gnn-filehub' ); ?></p>
@@ -279,7 +281,7 @@ class FileHub_Shortcodes {
             <div class="filehub-card filehub-manager">
                 <div class="filehub-manager-toolbar">
                     <h3><?php esc_html_e( 'Dosyalarım', 'gnn-filehub' ); ?></h3>
-                    <input type="text" class="filehub-search-input" placeholder="<?php esc_attr_e( 'Dosya ara...', 'gnn-filehub' ); ?>">
+                    <input type="text" class="filehub-search-input" aria-label="<?php esc_attr_e( 'Dosya ara...', 'gnn-filehub' ); ?>" placeholder="<?php esc_attr_e( 'Dosya ara...', 'gnn-filehub' ); ?>">
                 </div>
                 <div class="filehub-file-list" data-scope="own">
                     <p><?php esc_html_e( 'Yükleniyor...', 'gnn-filehub' ); ?></p>
@@ -317,7 +319,7 @@ class FileHub_Shortcodes {
             <div class="filehub-card filehub-manager">
                 <div class="filehub-manager-toolbar">
                     <h3><?php esc_html_e( 'Tüm Üye Dosyaları', 'gnn-filehub' ); ?></h3>
-                    <input type="text" class="filehub-search-input" placeholder="<?php esc_attr_e( 'Dosya veya yükleyen ara...', 'gnn-filehub' ); ?>">
+                    <input type="text" class="filehub-search-input" aria-label="<?php esc_attr_e( 'Dosya veya yükleyen ara...', 'gnn-filehub' ); ?>" placeholder="<?php esc_attr_e( 'Dosya veya yükleyen ara...', 'gnn-filehub' ); ?>">
                 </div>
                 <div class="filehub-file-list" data-scope="all">
                     <p><?php esc_html_e( 'Yükleniyor...', 'gnn-filehub' ); ?></p>
@@ -491,48 +493,35 @@ class FileHub_Shortcodes {
         wp_enqueue_script( 'filehub-public-js' );
 
         $registration_open = (bool) get_option( 'users_can_register' );
+        $email_verified    = isset( $_GET['filehub_verified'] ) && '1' === $_GET['filehub_verified'];
 
         ob_start();
         ?>
         <div class="filehub-container">
             <div class="filehub-card filehub-auth-card">
+                <?php if ( $email_verified ) : ?>
+                    <p role="status" class="filehub-status-notice"><?php esc_html_e( 'E-posta doğrulandı. Hesap sayfasından giriş yapabilirsiniz.', 'gnn-filehub' ); ?></p>
+                <?php endif; ?>
                 <?php if ( $registration_open ) : ?>
-                    <div class="filehub-auth-tabs">
-                        <button type="button" class="filehub-auth-tab is-active" data-target="login"><?php esc_html_e( 'Giriş Yap', 'gnn-filehub' ); ?></button>
-                        <button type="button" class="filehub-auth-tab" data-target="register"><?php esc_html_e( 'Kayıt Ol', 'gnn-filehub' ); ?></button>
+                    <div class="filehub-auth-tabs" role="tablist">
+                        <button type="button" id="filehub-tab-login" class="filehub-auth-tab is-active" role="tab" aria-selected="true" aria-controls="filehub-panel-login" data-target="login"><?php esc_html_e( 'Giriş Yap', 'gnn-filehub' ); ?></button>
+                        <button type="button" id="filehub-tab-register" class="filehub-auth-tab" role="tab" aria-selected="false" aria-controls="filehub-panel-register" tabindex="-1" data-target="register"><?php esc_html_e( 'Kayıt Ol', 'gnn-filehub' ); ?></button>
                     </div>
                 <?php else : ?>
                     <h3><?php esc_html_e( 'Kullanıcı Girişi', 'gnn-filehub' ); ?></h3>
                 <?php endif; ?>
 
-                <div class="filehub-auth-tab-panel" data-panel="login">
+                <div id="filehub-panel-login" class="filehub-auth-tab-panel" role="tabpanel" aria-labelledby="filehub-tab-login" data-panel="login">
                     <?php echo $this->render_login_form_markup(); ?>
                 </div>
 
                 <?php if ( $registration_open ) : ?>
-                    <div class="filehub-auth-tab-panel" data-panel="register" hidden>
+                    <div id="filehub-panel-register" class="filehub-auth-tab-panel" role="tabpanel" aria-labelledby="filehub-tab-register" data-panel="register" hidden>
                         <?php echo $this->render_register_form_markup(); ?>
                     </div>
                 <?php endif; ?>
             </div>
         </div>
-        <?php if ( $registration_open ) : ?>
-        <script>
-        (function() {
-            var root = document.currentScript.previousElementSibling;
-            if ( ! root ) return;
-            var tabs   = root.querySelectorAll( '.filehub-auth-tab' );
-            var panels = root.querySelectorAll( '.filehub-auth-tab-panel' );
-            tabs.forEach( function( tab ) {
-                tab.addEventListener( 'click', function() {
-                    var target = tab.getAttribute( 'data-target' );
-                    tabs.forEach( function( t ) { t.classList.toggle( 'is-active', t === tab ); } );
-                    panels.forEach( function( p ) { p.hidden = p.getAttribute( 'data-panel' ) !== target; } );
-                } );
-            } );
-        })();
-        </script>
-        <?php endif; ?>
         <?php
         return ob_get_clean();
     }
@@ -593,7 +582,7 @@ class FileHub_Shortcodes {
                 <h3><?php esc_html_e( 'Depolama Kotası ve Kullanım', 'gnn-filehub' ); ?></h3>
                 <p style="margin-bottom: 8px;">
                     <?php if ( $stats['quota_bytes'] > 0 ) : ?>
-                        <strong><?php echo esc_html( $stats['used_formatted'] ); ?></strong> / <?php echo esc_html( $stats['quota_formatted'] ); ?> (%<?php echo esc_html( $stats['percentage'] ); ?> Dolu)
+                        <strong><?php echo esc_html( $stats['used_formatted'] ); ?></strong> / <?php echo esc_html( $stats['quota_formatted'] ); ?> (<?php echo esc_html( sprintf( /* translators: %s: percentage of quota used */ __( '%%%s Dolu', 'gnn-filehub' ), $stats['percentage'] ) ); ?>)
                     <?php else : ?>
                         <strong><?php echo esc_html( $stats['used_formatted'] ); ?></strong> (<?php esc_html_e( 'Sınırsız kota', 'gnn-filehub' ); ?>)
                     <?php endif; ?>

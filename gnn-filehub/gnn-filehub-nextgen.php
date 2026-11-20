@@ -11,6 +11,7 @@
  * Text Domain:       gnn-filehub
  * Domain Path:       /languages
  * Requires at least: 6.0
+ * Tested up to:      7.1
  * Requires PHP:      8.0
  */
 
@@ -44,7 +45,7 @@ add_action( 'plugins_loaded', 'gnn_filehub_init' );
 // Add Donate, Settings & Check Updates links to the Plugins list row
 function gnn_filehub_plugin_action_links( $links, $file ) {
     if ( $file === plugin_basename( GNN_FILEHUB_FILE ) ) {
-        $donate_link = '<a href="https://buymeacoffee.com/bigdesigner" target="_blank" style="font-weight:bold; color:#d63638;">' . esc_html__( 'Donate', 'gnn-filehub' ) . '</a>';
+        $donate_link = '<a href="https://buymeacoffee.com/bigdesigner" target="_blank" rel="noopener noreferrer" style="font-weight:bold; color:#d63638;">' . esc_html__( 'Donate', 'gnn-filehub' ) . '</a>';
 
         $settings_link = '<a href="' . esc_url( admin_url( 'admin.php?page=filehub-settings' ) ) . '">' . esc_html__( 'Settings', 'gnn-filehub' ) . '</a>';
 

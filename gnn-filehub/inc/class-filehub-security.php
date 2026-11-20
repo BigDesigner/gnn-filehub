@@ -112,11 +112,14 @@ class FileHub_Security {
 
     public static function password_length(string $password): int { return preg_match_all('/./us',$password) ?: 0; }
 
+    public static function safe_extensions(): array {
+        return array( 'jpg','jpeg','png','gif','webp','avif','pdf','zip','doc','docx','xls','xlsx','ppt','pptx','txt','csv','mp3','mp4' );
+    }
+
     public static function allowed_extensions(): array {
         $raw = get_option( 'filehub_allowed_extensions', 'jpg,jpeg,png,gif,pdf,zip,doc,docx,xlsx' );
         $parts = explode( ',', is_string( $raw ) ? strtolower( $raw ) : '' );
-        $safe = array( 'jpg','jpeg','png','gif','webp','pdf','zip','doc','docx','xls','xlsx','ppt','pptx','txt','csv','mp3','mp4' );
-        return array_values( array_intersect( array_map( function( $v ) { return ltrim( trim( $v ), '.' ); }, $parts ), $safe ) );
+        return array_values( array_intersect( array_map( function( $v ) { return ltrim( trim( $v ), '.' ); }, $parts ), self::safe_extensions() ) );
     }
 
     public static function valid_filename( $name ) {
@@ -135,7 +138,7 @@ class FileHub_Security {
         if ( ! class_exists( 'finfo' ) ) { return self::error( __( 'Sunucuda PHP Fileinfo etkinleştirilmelidir.', 'gnn-filehub' ), 503 ); }
         $ext = strtolower( pathinfo( $filename, PATHINFO_EXTENSION ) );
         $types = array(
-            'jpg'=>array('image/jpeg'), 'jpeg'=>array('image/jpeg'), 'png'=>array('image/png'), 'gif'=>array('image/gif'), 'webp'=>array('image/webp'),
+            'jpg'=>array('image/jpeg'), 'jpeg'=>array('image/jpeg'), 'png'=>array('image/png'), 'gif'=>array('image/gif'), 'webp'=>array('image/webp'), 'avif'=>array('image/avif'),
             'pdf'=>array('application/pdf'), 'zip'=>array('application/zip','application/x-zip-compressed'),
             'doc'=>array('application/msword','application/x-ole-storage','application/CDFV2'),
             'xls'=>array('application/vnd.ms-excel','application/x-ole-storage','application/CDFV2'),

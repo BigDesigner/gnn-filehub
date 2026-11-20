@@ -103,7 +103,7 @@
     // Belt-and-suspenders: some toggles change styling through mechanisms our observer can't
     // see (a swapped stylesheet, a framework re-render). Re-checking every couple of seconds
     // guarantees we self-correct quickly regardless of the theme's exact mechanism.
-    setInterval( applyFilehubTheming, 2000 );
+    setInterval(function () { if (!document.hidden) applyFilehubTheming(); }, 2000);
   }
 
   if (document.readyState === 'loading') {
@@ -141,7 +141,14 @@ document.addEventListener('DOMContentLoaded', function () {
         const headers = { 'X-WP-Nonce': config.nonce, ...options.headers };
         if (token) headers['X-FileHub-Token'] = token;
         const response = await fetch(endpoint(path), { credentials: 'same-origin', ...options, headers });
-        const data = await response.json();
+        let data;
+        try {
+          data = await response.json();
+        } catch (_) {
+          const parseError = new Error(t('network'));
+          parseError.status = response.status || 502;
+          throw parseError;
+        }
         if (!response.ok || data.success === false) {
           const error = new Error(data.message || data.error || t('error'));
           error.status = response.status;
@@ -158,11 +165,47 @@ document.addEventListener('DOMContentLoaded', function () {
 
   document.querySelectorAll('.filehub-container input[type="password"]').forEach(input => {
     const button = node('button', t('show'), 'filehub-password-toggle');
-    button.type = 'button'; button.setAttribute('aria-label', t('show'));
-    input.insertAdjacentElement('afterend', button);
+    button.type = 'button'; button.setAttribute('aria-label', t('show')); button.setAttribute('aria-pressed', 'false');
+    if (input.parentNode) {
+      const wrap = node('div', undefined, 'filehub-password-wrap');
+      input.parentNode.insertBefore(wrap, input);
+      wrap.append(input, button);
+    } else {
+      input.insertAdjacentElement('afterend', button);
+    }
     button.addEventListener('click', () => {
       const visible = input.type === 'password'; input.type = visible ? 'text' : 'password';
-      button.textContent = t(visible ? 'hide' : 'show'); button.setAttribute('aria-pressed', String(visible));
+      const label = t(visible ? 'hide' : 'show');
+      button.textContent = label; button.setAttribute('aria-label', label); button.setAttribute('aria-pressed', String(visible));
+    });
+  });
+
+  document.querySelectorAll('.filehub-auth-tabs').forEach(tablist => {
+    const tabs = Array.from(tablist.querySelectorAll('[role="tab"]'));
+    const card = tablist.closest('.filehub-card');
+    if (!tabs.length || !card) return;
+    const panels = Array.from(card.querySelectorAll('[role="tabpanel"]'));
+    function activate(tab, moveFocus) {
+      const target = tab.getAttribute('data-target');
+      tabs.forEach(item => {
+        const selected = item === tab;
+        item.classList.toggle('is-active', selected);
+        item.setAttribute('aria-selected', String(selected));
+        item.setAttribute('tabindex', selected ? '0' : '-1');
+      });
+      panels.forEach(panel => { panel.hidden = panel.getAttribute('data-panel') !== target; });
+      if (moveFocus) tab.focus();
+    }
+    tabs.forEach((tab, index) => {
+      tab.addEventListener('click', () => activate(tab, false));
+      tab.addEventListener('keydown', event => {
+        let next = -1;
+        if (event.key === 'ArrowRight') next = (index + 1) % tabs.length;
+        else if (event.key === 'ArrowLeft') next = (index - 1 + tabs.length) % tabs.length;
+        else if (event.key === 'Home') next = 0;
+        else if (event.key === 'End') next = tabs.length - 1;
+        if (next >= 0) { event.preventDefault(); activate(tabs[next], true); }
+      });
     });
   });
 
@@ -236,7 +279,7 @@ document.addEventListener('DOMContentLoaded', function () {
       if (cancel) cancel.hidden = false;
       try { await upload(file); }
       catch (error) {
-        failures++;
+        if (error.name !== 'AbortError') failures++;
         if (status) status.textContent = error.name === 'AbortError' ? t('cancelled') : (error.message || t('network')) + ' ' + t('chooseAgain');
       }
       session = null; await refreshLists();
@@ -273,18 +316,27 @@ document.addEventListener('DOMContentLoaded', function () {
     try { const url = new URL(raw); return url.origin === base.origin && (url.searchParams.has('rest_route') ? /^\/filehub\/v1\/download\/\d+$/.test(url.searchParams.get('rest_route')) : url.pathname.startsWith(endpoint('download/').pathname)) && ['http:','https:'].includes(url.protocol) ? url.href : ''; }
     catch (_) { return ''; }
   }
-  async function preview(item) {
-    if (item.size_bytes > 8 * 1048576 || !['image/jpeg','image/png','image/gif','image/webp','application/pdf'].includes(item.mime_type)) throw new Error(t('previewLimit'));
+  const PREVIEW_MIMES = ['image/jpeg','image/png','image/gif','image/webp','image/avif','application/pdf'];
+  async function preview(item, opener, container) {
+    if (item.size_bytes > 8 * 1048576 || !PREVIEW_MIMES.includes(item.mime_type)) throw new Error(t('previewLimit'));
     const url = downloadUrl(item.download_url); if (!url) throw new Error(t('error'));
     const response = await fetch(url, { credentials: 'same-origin', headers: { 'X-WP-Nonce': config.nonce } });
     if (!response.ok || Number(response.headers.get('Content-Length')) > 8 * 1048576) throw new Error(t('previewLimit'));
     const blob = await response.blob(); if (blob.size > 8 * 1048576 || blob.type !== item.mime_type) throw new Error(t('previewLimit'));
     const objectUrl = URL.createObjectURL(blob); const dialog = node('dialog', undefined, 'filehub-preview');
+    dialog.setAttribute('aria-label', item.file_name || t('preview'));
+    if (container && typeof container.closest === 'function' && container.closest('.filehub-container.filehub-theme-dark')) {
+      dialog.classList.add('filehub-theme-dark');
+    }
     const close = node('button', t('close'), 'button'); close.type = 'button';
     const media = node(item.mime_type === 'application/pdf' ? 'iframe' : 'img');
     if (media.tagName === 'IFRAME') { media.setAttribute('sandbox', ''); media.title = item.file_name; } else media.alt = item.file_name;
     media.src = objectUrl; dialog.append(close, media); document.body.append(dialog);
-    dialog.addEventListener('close', () => { URL.revokeObjectURL(objectUrl); dialog.remove(); }, { once: true });
+    dialog.addEventListener('close', () => {
+      URL.revokeObjectURL(objectUrl); dialog.remove();
+      if (opener && typeof opener.focus === 'function') opener.focus();
+    }, { once: true });
+    dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
     close.addEventListener('click', () => dialog.close()); dialog.showModal();
   }
   function render(container, items, pages) {
@@ -301,9 +353,9 @@ document.addEventListener('DOMContentLoaded', function () {
       row.append(node('td', item.download_count)); const actions = node('td'); row.append(actions); body.append(row);
       const href = downloadUrl(item.download_url);
       if (href) { const link = node('a', t('download'), 'filehub-action-btn filehub-btn-download'); link.href = href; link.target = '_blank'; link.rel = 'noopener noreferrer'; actions.append(link); }
-      if (href && item.size_bytes <= 8 * 1048576 && ['image/jpeg','image/png','image/gif','image/webp','application/pdf'].includes(item.mime_type)) {
-        const button = node('button', t('preview'), 'filehub-action-btn'); button.type = 'button'; actions.append(button);
-        button.addEventListener('click', async () => { button.disabled = true; try { await preview(item); } catch (error) { button.textContent = error.message; } finally { button.disabled = false; } });
+      if (href && item.size_bytes <= 8 * 1048576 && PREVIEW_MIMES.includes(item.mime_type)) {
+        const button = node('button', t('preview'), 'filehub-action-btn filehub-btn-preview'); button.type = 'button'; actions.append(button);
+        button.addEventListener('click', async () => { button.disabled = true; try { await preview(item, button, container); } catch (error) { button.textContent = error.message; } finally { button.disabled = false; } });
       }
       if (item.can_delete) {
         const button = node('button', t('delete'), 'filehub-action-btn filehub-btn-delete'); button.type = 'button'; actions.append(button);
@@ -316,12 +368,15 @@ document.addEventListener('DOMContentLoaded', function () {
         });
       }
     });
-    const nav = node('div', undefined, 'filehub-pagination');
-    for (const [key, target] of [['previous',state.page-1],['next',state.page+1]]) {
-      const button = node('button', t(key), 'button'); button.type = 'button'; button.disabled = target < 1 || target > pages;
-      button.addEventListener('click', () => { state.page = target; fetchList(container); }); nav.append(button);
-    }
-    nav.setAttribute('aria-label', String(state.page) + '/' + Math.max(1,pages)); container.append(nav);
+    const nav = node('nav', undefined, 'filehub-pagination');
+    const totalPages = Math.max(1, pages);
+    const prevBtn = node('button', t('previous'), 'button'); prevBtn.type = 'button'; prevBtn.disabled = state.page <= 1;
+    prevBtn.addEventListener('click', () => { state.page = state.page - 1; fetchList(container); });
+    const pageInfo = node('span', String(state.page) + ' / ' + String(totalPages), 'filehub-page-indicator');
+    const nextBtn = node('button', t('next'), 'button'); nextBtn.type = 'button'; nextBtn.disabled = state.page >= totalPages;
+    nextBtn.addEventListener('click', () => { state.page = state.page + 1; fetchList(container); });
+    nav.append(prevBtn, pageInfo, nextBtn);
+    nav.setAttribute('aria-label', String(state.page) + '/' + totalPages); container.append(nav);
   }
   async function fetchList(container) {
     const state = stateFor(container); if (state.request) state.request.abort();

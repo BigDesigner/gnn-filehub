@@ -46,6 +46,12 @@ class FileHub_Lifecycle {
     }
     public function hide_files($query) {
         if($query->get('filehub_internal'))return;
+        $post_type=$query->get('post_type');
+        $targets_attachments=$query->is_attachment()
+            || 'attachment'===$post_type
+            || 'any'===$post_type
+            || (is_array($post_type) && (in_array('attachment',$post_type,true) || in_array('any',$post_type,true)));
+        if(!$targets_attachments)return;
         $meta=$query->get('meta_query');
         $query->set('meta_query',array('relation'=>'AND',is_array($meta)?$meta:array(),array('key'=>'_filehub_storage_driver','compare'=>'NOT EXISTS')));
     }
@@ -86,7 +92,7 @@ class FileHub_Lifecycle {
         return $user;
     }
     public function configuration_changed($option,$old,$new) {
-        if(strpos($option,'filehub_gdrive_')===0)delete_transient('filehub_gdrive_access_token');
+        if(strpos($option,'filehub_gdrive_')===0)delete_transient('filehub_gdrive_token_'.substr(FileHub_Security::configuration_hash('gdrive'),0,24));
     }
     public function maintain() { FileHub_Uploads::cleanup(); $this->migrate(); $this->clean_legacy_chunks(); }
     public function migrate() {
