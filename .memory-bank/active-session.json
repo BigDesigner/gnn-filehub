@@ -4,46 +4,25 @@
   "status": "ACTIVE",
   "mode": "Interactive",
   "preferred_language": "Turkish",
-  "timestamp": "2026-10-26T01:01:47.183927+03:00",
+  "timestamp": "2026-11-20T04:10:15+03:00",
   "active_branch": "main",
-  "last_commit": "1cea15e",
+  "last_commit": "8577384",
   "git_history_available": true,
-  "worktree_status": "documentation closure pending commit",
+  "worktree_status": "clean",
   "current_sprint": {
-    "sprint_id": "v1.7.0-security-remediation",
+    "sprint_id": "v1.7.1-compatibility-and-hardening",
     "active_tasks": [],
-    "completed_findings": [
-      "F01",
-      "F02",
-      "F03",
-      "F04",
-      "F05",
-      "F06",
-      "F07",
-      "F08",
-      "F09",
-      "F10",
-      "F11",
-      "F12",
-      "F13",
-      "F14",
-      "F15",
-      "F16",
-      "F17",
-      "F18",
-      "F19",
-      "F20",
-      "F21",
-      "F22",
-      "F23",
-      "F24",
-      "F25",
-      "F26",
-      "F27",
-      "F28",
-      "F29"
+    "completed_items": [
+      "WP 7.1 / 7.2 RC1 & PHP 8.5 compatibility",
+      "Password toggle wrapper DOM/CSS fix",
+      "Donate rel=noopener noreferrer & PHP 8 nonce/input type guards",
+      "Updater requires/requires_php/tested/no_update & URL sanitization",
+      "chunk_size_from_limits post_max_size=0 fix",
+      "hide_files pre_get_posts attachment scoping",
+      "AVIF support, ARIA auth tabs, dialog dark mode/dvh/focus, .button styles",
+      "346-message POT refresh & CI matrix Node 24 + PHP 8.5"
     ],
-    "verification": "local passed; GitHub PHP 8.0/WP6.0, PHP8.3/latest, PHP8.4/latest passed; Release 40238093405 published v1.7.0"
+    "verification": "local passed (36/36 WP regressions, 15/15 HTTP, 14/14 client, 2/2 concurrency); GitHub Verify (44651130717) & Release v1.7.1 (44651134825) passed"
   },
   "tracked_memory_areas": {
     "adr": ".memory-bank/adr/",
@@ -58,7 +37,6 @@
     "boundary_conditions": "a7d88f54150ab2ef1850ed7bdb0cbbb23968f7abb1c874a3e28347ca9738ceb2",
     "agents_rules": "26a50da40340478c68d31027e5c53ba8cf3ed32c3eddd3b6923ba503ff6a727f"
   },
-  "source_sha256": "13ba4e32e37c152aa0efe910e1ef33d7a8af63f5a4ceca21e00fa4606db8cf63",
   "publication_policy": "Commit and push changes; GitHub Actions builds packages from version tags. Do not prepare local distribution packages.",
-  "publication_ref": "v1.7.0"
+  "publication_ref": "v1.7.1"
 }

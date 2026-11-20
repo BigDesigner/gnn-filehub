@@ -1,6 +1,6 @@
 # Project Sprint Pipeline
 
-Current sprint: **v1.7.0 security remediation — implemented, local and GitHub matrix verification passed; v1.7.0 published**. See the current checklist and `.tasks/remediation-plan.md` for evidence.
+Current sprint: **v1.7.1 compatibility, UI, updater and accessibility hardening — implemented, local and GitHub CI/Release v1.7.1 passed**. See `.tasks/remediation-plan.md` for earlier v1.7.0 findings.
 
 ## Historical Sprint: v0.3.0-alpha (earlier Playground checks)
 
@@ -43,3 +43,12 @@ Historical completion claims above do not certify the current revision.
 - [x] Regression verification and repeat sentinel-audit; update findings with evidence.
 
 Local verification: 32/32 WordPress, 15/15 real HTTP, 14/14 client checks, 2/2 concurrent reservation checks; syntax, catalog, version and package checks passed. Remote CI and real provider/host checks are deployment follow-up, not executed claims.
+
+## 2026-11-20: v1.7.1 Compatibility, UI, Updater & CI Hardening (Current)
+- [x] Verify WordPress 7.1 / 7.2 RC1 & PHP 8.5 compatibility, `Tested up to` header and `init` priority `1` textdomain hook.
+- [x] Fix `.filehub-password-wrap` DOM/CSS positioning, front-end `.button` styles and `<dialog>` dark-mode/`dvh`/focus behavior.
+- [x] Add `rel="noopener noreferrer"`, PHP 8 nonce/input scalar guards and safe account page permalink fallbacks.
+- [x] Upgrade `FileHub_Updater` with `requires`/`requires_php`/`tested`, `no_update`, `get_package_url()` and folder alignment.
+- [x] Fix `chunk_size_from_limits()` for `post_max_size = 0`, scope `hide_files()` to attachment queries and add `.avif` support.
+- [x] Add ARIA tablist/keyboard navigation, `:focus-visible` rings, missing gettext strings (346 POT messages) and update CI to Node 24 + PHP 8.5.
+- [x] Run full local verification (36/36 WP regressions, 15/15 HTTP, 14/14 client, 2/2 concurrency) and publish `v1.7.1` (`e845463`, `8577384`, CI runs `44651130717` & `44651134825` passed).

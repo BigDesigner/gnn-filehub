@@ -52,3 +52,14 @@ F01-F29 were implemented and locally verified in v1.7.0; closure evidence is tra
 | F27 | Implemented / locally verified | R08, R22 |
 | F28 | Implemented / locally verified | R14 |
 | F29 | Implemented / locally verified | 333-message catalog check; client contract; static keyboard/redirect review |
+
+## 2026-11-20 v1.7.1 audit & hardening
+
+| Bug ID | Title / Vulnerability | Type | Status | Source / Evidence | Confidence | Next Action |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| UI-001 | Password toggle detached without `.filehub-password-wrap`; missing front-end `.button` styles and `<dialog>` dark mode/`dvh` | UI / CSS | Resolved | `filehub-public.js`, `filehub-public.css` | Verified (code review & JS checks) | None |
+| SEC-006 | Donate link missing `rel="noopener noreferrer"`; PHP 8 `TypeError` risk on non-string admin nonces/`$_GET`/`$_POST` | Security / Robustness | Resolved | `gnn-filehub-nextgen.php`, `class-filehub-admin.php` | Verified (`php -l`, `test-regressions.php`) | None |
+| UPD-001 | `FileHub_Updater` missing `requires`/`requires_php`/`tested`, `no_update` auto-update support and strict URL helper | Compatibility | Resolved | `class-filehub-updater.php`, `R35` | Verified (`R35` passed) | None |
+| UPLOAD-003 | `chunk_size()` returned 1 MiB when `post_max_size=0` regardless of smaller `upload_max_filesize` | Functional | Resolved | `class-filehub-uploads.php`, `R33` | Verified (`R33` passed) | None |
+| PERF-002 | `hide_files()` attached `NOT EXISTS` meta query to all site `WP_Query` calls including posts/pages | Performance | Resolved | `class-filehub-lifecycle.php`, `R36` | Verified (`R03`, `R36` passed) | None |
+| A11Y-001 | Auth tabs lacked ARIA tablist/keyboard support; missing `:focus-visible`, search `aria-label`, and `<dialog>` focus restore | Accessibility | Resolved | `class-filehub-shortcodes.php`, `filehub-public.js`, `filehub-public.css`, `filehub-admin.css` | Verified (`test-client.cjs`) | None |
