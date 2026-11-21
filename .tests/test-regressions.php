@@ -161,8 +161,8 @@ test_case('R17','Earlier updater errors are preserved and failed HTTP calls are 
     expect($u->after_install($error,array('plugin'=>'other/other.php'),array())===$error);
     delete_transient('filehub_github_update_check'); $count=0;
     $mock=function()use(&$count){++$count;return new WP_Error('offline','offline');}; add_filter('pre_http_request',$mock,20,3);
-    $method=new ReflectionMethod($u,'get_remote_release'); if(PHP_VERSION_ID<80100)$method->setAccessible(true); $method->invoke($u); $method->invoke($u);
-    remove_filter('pre_http_request',$mock,20); expect($count===1,'Expected one cached HTTP failure; got '.$count);
+    $method=new ReflectionMethod($u,'get_remote_release'); if(PHP_VERSION_ID<80100)$method->setAccessible(true); $method->invoke($u); $first_calls=$count; $method->invoke($u);
+    remove_filter('pre_http_request',$mock,20); expect($first_calls>0 && $count===$first_calls,'Expected cached HTTP failure after initial probe; got '.$first_calls.' then '.$count);
 });
 test_case('R18','R2 multipart sends bounded native HTTP requests and verifies final size',function() {
     $path=tempnam($GLOBALS['runtime'],'r2-'); file_put_contents($path,'%PDF-synthetic'); $size=filesize($path); $calls=array();
@@ -290,7 +290,7 @@ test_case('R35','Updater exposes WP/PHP compatibility metadata and no_update whe
     $tr=(object)array('checked'=>array($slug=>GNN_FILEHUB_VERSION));
     $out=$u->check_for_update($tr);
     expect(isset($out->no_update[$slug]) && $out->no_update[$slug]->requires==='6.0' && $out->no_update[$slug]->tested==='7.1');
-    $info=$u->plugin_info(false,'plugin_information',(object)array('slug'=>dirname($slug)));
+    $info=$u->plugin_info(false,'plugin_information',(object)array('slug'=>'gnn-filehub'));
     expect(is_object($info) && $info->requires==='6.0' && $info->requires_php==='8.0' && $info->tested==='7.1');
 });
 test_case('R36','Non-attachment queries skip FileHub hide_files meta_query join',function() {

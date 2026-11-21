@@ -560,9 +560,6 @@ msgstr ""
 msgid "Güncel yükleme veya kota sınırı aşılıyor."
 msgstr ""
 
-msgid "Güncelleme paketi geçerli bir FileHub paketi değil."
-msgstr ""
-
 msgid "Güncellenecek bir bilgi gönderilmedi."
 msgstr ""
 
