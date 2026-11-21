@@ -5,149 +5,238 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 /**
  * Class FileHub_Updater
- * Checks GitHub Releases API for plugin updates and integrates with WordPress Core Update System.
+ * Checks GitHub Releases for plugin updates and integrates with WordPress Core Update System.
  */
 class FileHub_Updater {
 
-    /**
-     * GitHub Repository (owner/repo)
-     */
-    private $repo = 'BigDesigner/gnn-filehub';
+    private $repo            = 'BigDesigner/gnn-filehub';
+    private $slug            = 'gnn-filehub';
+    private $main_file       = '';
+    private $plugin_basename = 'gnn-filehub/gnn-filehub-nextgen.php';
+    private $transient_key   = 'filehub_github_update_check';
+    private $cache_duration  = 43200; // 12 * HOUR_IN_SECONDS
+    private $requires_wp     = '6.0';
+    private $requires_php    = '8.0';
+    private $tested_up_to    = '7.1';
+    private $was_active      = false;
 
-    /**
-     * Plugin Slug (folder/file.php)
-     */
-    private $plugin_slug = '';
-
-    /**
-     * Transient Key for Caching GitHub API Response
-     */
-    private $transient_key = 'filehub_github_update_check';
-
-    /**
-     * Cache Duration (12 Hours)
-     */
-    private $cache_duration = 43200;
-
-    /**
-     * Compatibility Metadata for WP Update & Details API
-     */
-    private $requires_wp  = '6.0';
-    private $requires_php = '8.0';
-    private $tested_up_to = '7.1';
-
-    /**
-     * Constructor & Hook Initialization
-     */
     public function __construct() {
-        $this->plugin_slug = plugin_basename( GNN_FILEHUB_FILE );
+        if ( defined( 'GNN_FILEHUB_FILE' ) ) {
+            $this->main_file       = GNN_FILEHUB_FILE;
+            $this->plugin_basename = plugin_basename( GNN_FILEHUB_FILE );
+        } else {
+            $this->main_file = dirname( __DIR__ ) . '/gnn-filehub-nextgen.php';
+        }
 
-        // WordPress Plugin Update Filters
         add_filter( 'pre_set_site_transient_update_plugins', array( $this, 'check_for_update' ) );
         add_filter( 'plugins_api', array( $this, 'plugin_info' ), 20, 3 );
+        add_filter( 'upgrader_pre_install', array( $this, 'capture_pre_install_state' ), 10, 2 );
         add_filter( 'upgrader_post_install', array( $this, 'after_install' ), 10, 3 );
-        add_filter('upgrader_source_selection',array($this,'validate_source'),10,4);
 
-        // Admin Manual Check Hooks
         add_action( 'admin_init', array( $this, 'handle_manual_check' ) );
         add_action( 'load-update-core.php', array( $this, 'clear_cache' ) );
     }
 
-    /**
-     * Get Local Installed Version
-     */
     private function get_local_version(): string {
-        return defined( 'GNN_FILEHUB_VERSION' ) ? GNN_FILEHUB_VERSION : '1.0.0';
+        if ( defined( 'GNN_FILEHUB_VERSION' ) ) {
+            return GNN_FILEHUB_VERSION;
+        }
+
+        if ( ! function_exists( 'get_plugin_data' ) ) {
+            require_once ABSPATH . 'wp-admin/includes/plugin.php';
+        }
+
+        $plugin_data = get_plugin_data( $this->main_file, false, false );
+        return ! empty( $plugin_data['Version'] ) ? $plugin_data['Version'] : '0.0.0';
     }
 
-    private function sanitize_github_url( string $url, string $required_prefix ): string {
+    private function sanitize_github_url( string $url ): string {
         $clean = esc_url_raw( $url, array( 'https' ) );
-        if ( '' === $clean || 0 !== strpos( $clean, $required_prefix ) ) {
+        if ( '' === $clean ) {
             return '';
         }
+
         $parts = wp_parse_url( $clean );
-        if ( ! is_array( $parts ) || 'https' !== ( $parts['scheme'] ?? '' ) || 'github.com' !== ( $parts['host'] ?? '' ) ) {
+        if ( ! is_array( $parts ) || 'https' !== strtolower( $parts['scheme'] ?? '' ) || empty( $parts['host'] ) ) {
             return '';
         }
-        return $clean;
+
+        $host          = strtolower( $parts['host'] );
+        $allowed_hosts = array(
+            'github.com',
+            'api.github.com',
+            'codeload.github.com',
+            'objects.githubusercontent.com',
+            'release-assets.githubusercontent.com',
+        );
+
+        $is_allowed = in_array( $host, $allowed_hosts, true )
+            || (bool) preg_match( '/^(?:[a-z0-9-]+\.)+githubusercontent\.com$/', $host );
+
+        return $is_allowed ? $clean : '';
     }
 
-    private function get_package_url( $release_body, string $remote_version ): string {
-        if ( empty( $release_body->assets ) || ! is_array( $release_body->assets ) ) {
-            return '';
-        }
-        $expected_name   = 'gnn-filehub-v' . $remote_version . '.zip';
-        $expected_prefix = 'https://github.com/' . $this->repo . '/releases/download/v' . $remote_version . '/';
-        foreach ( $release_body->assets as $asset ) {
-            if ( isset( $asset->name, $asset->browser_download_url ) && $asset->name === $expected_name ) {
-                $url = $this->sanitize_github_url( (string) $asset->browser_download_url, $expected_prefix );
-                if ( '' !== $url ) {
-                    return $url;
+    private function get_package_url_from_api( $release_body ): string {
+        if ( ! empty( $release_body->assets ) && is_array( $release_body->assets ) ) {
+            foreach ( $release_body->assets as $asset ) {
+                if ( isset( $asset->browser_download_url, $asset->name ) && '.zip' === strtolower( substr( (string) $asset->name, -4 ) ) ) {
+                    $url = $this->sanitize_github_url( (string) $asset->browser_download_url );
+                    if ( '' !== $url ) {
+                        return $url;
+                    }
                 }
             }
         }
+
+        if ( ! empty( $release_body->zipball_url ) ) {
+            return $this->sanitize_github_url( (string) $release_body->zipball_url );
+        }
+
         return '';
     }
 
-    /**
-     * Fetch Remote Release Info from GitHub API
-     */
+    private function get_fallback_release() {
+        $latest_url = 'https://github.com/' . $this->repo . '/releases/latest';
+        $user_agent = 'WordPress/' . get_bloginfo( 'version' ) . '; ' . home_url();
+
+        $head = wp_remote_head(
+            $latest_url,
+            array(
+                'redirection' => 0,
+                'timeout'     => 10,
+                'headers'     => array(
+                    'User-Agent' => $user_agent,
+                ),
+            )
+        );
+
+        if ( is_wp_error( $head ) ) {
+            return false;
+        }
+
+        $location = wp_remote_retrieve_header( $head, 'location' );
+        if ( ! is_string( $location ) || ! preg_match( '#/releases/tag/([^/?#]+)$#', $location, $matches ) ) {
+            return false;
+        }
+
+        $tag            = rawurldecode( $matches[1] );
+        $remote_version = ltrim( $tag, 'vV' );
+
+        if ( ! preg_match( '/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/', $remote_version ) ) {
+            return false;
+        }
+
+        $download_url    = '';
+        $expanded_url    = 'https://github.com/' . $this->repo . '/releases/expanded_assets/' . rawurlencode( $tag );
+        $assets_response = wp_remote_get(
+            $expanded_url,
+            array(
+                'timeout' => 10,
+                'headers' => array(
+                    'User-Agent' => $user_agent,
+                ),
+            )
+        );
+
+        if ( ! is_wp_error( $assets_response ) && 200 === wp_remote_retrieve_response_code( $assets_response ) ) {
+            $html = wp_remote_retrieve_body( $assets_response );
+            if ( preg_match_all( '/href=["\']([^"\']+\.zip)["\']/i', $html, $asset_matches ) ) {
+                foreach ( $asset_matches[1] as $href ) {
+                    $candidate = 0 === strpos( $href, '/' ) ? 'https://github.com' . $href : $href;
+                    $sanitized = $this->sanitize_github_url( $candidate );
+                    if ( '' !== $sanitized ) {
+                        $download_url = $sanitized;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if ( '' === $download_url ) {
+            $download_url = $this->sanitize_github_url( 'https://github.com/' . $this->repo . '/archive/refs/tags/' . rawurlencode( $tag ) . '.zip' );
+        }
+
+        if ( '' === $download_url ) {
+            return false;
+        }
+
+        $html_url = $this->sanitize_github_url( 'https://github.com/' . $this->repo . '/releases/tag/' . rawurlencode( $tag ) );
+
+        return (object) array(
+            'version'      => $remote_version,
+            'download_url' => $download_url,
+            'changelog'    => '',
+            'published_at' => '',
+            'html_url'     => $html_url ? $html_url : 'https://github.com/' . $this->repo,
+        );
+    }
+
     private function get_remote_release() {
         $cached = get_transient( $this->transient_key );
         if ( false !== $cached ) {
-            return is_object($cached) ? $cached : false;
+            if ( ! is_object( $cached ) || ! empty( $cached->failed ) ) {
+                return false;
+            }
+            return $cached;
         }
 
-        $url  = sprintf( 'https://api.github.com/repos/%s/releases/latest', $this->repo );
-        $args = array(
-            'headers' => array(
-                'Accept'     => 'application/vnd.github.v3+json',
-                'User-Agent' => 'WordPress/' . get_bloginfo( 'version' ) . '; ' . home_url(),
-            ),
-            'timeout' => 10,
+        $api_url      = 'https://api.github.com/repos/' . $this->repo . '/releases/latest';
+        $response     = wp_remote_get(
+            $api_url,
+            array(
+                'timeout' => 10,
+                'headers' => array(
+                    'Accept'     => 'application/vnd.github.v3+json',
+                    'User-Agent' => 'WordPress/' . get_bloginfo( 'version' ) . '; ' . home_url(),
+                ),
+            )
         );
+        $release_data = false;
 
-        $response = wp_remote_get( $url, $args );
+        if ( ! is_wp_error( $response ) && 200 === wp_remote_retrieve_response_code( $response ) ) {
+            $body = json_decode( wp_remote_retrieve_body( $response ) );
+            if ( is_object( $body ) && ! empty( $body->tag_name ) ) {
+                $remote_version = ltrim( (string) $body->tag_name, 'vV' );
+                if ( preg_match( '/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/', $remote_version ) ) {
+                    $download_url = $this->get_package_url_from_api( $body );
+                    if ( '' !== $download_url ) {
+                        $repo_url     = 'https://github.com/' . $this->repo;
+                        $html_url     = isset( $body->html_url ) ? $this->sanitize_github_url( (string) $body->html_url ) : '';
+                        $release_data = (object) array(
+                            'version'      => $remote_version,
+                            'download_url' => $download_url,
+                            'changelog'    => isset( $body->body ) && is_string( $body->body ) ? $body->body : '',
+                            'published_at' => isset( $body->published_at ) && is_string( $body->published_at ) ? $body->published_at : '',
+                            'html_url'     => $html_url ? $html_url : $repo_url,
+                        );
+                    }
+                }
+            }
+        }
 
-        if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {
-            set_transient( $this->transient_key, array('failed'=>true), 300 ); // Cache failure for 5 mins
+        if ( false === $release_data ) {
+            $release_data = $this->get_fallback_release();
+        }
+
+        if ( false === $release_data ) {
+            set_transient( $this->transient_key, (object) array( 'failed' => true ), 300 );
             return false;
         }
-
-        $body = json_decode( wp_remote_retrieve_body( $response ) );
-
-        if ( empty( $body ) || ! isset( $body->tag_name ) || !preg_match('/^v?[0-9]+\.[0-9]+\.[0-9]+$/D',(string)$body->tag_name) ) {
-            set_transient($this->transient_key,array('failed'=>true),300);
-            return false;
-        }
-
-        $remote_version = ltrim( $body->tag_name, 'v' );
-        $download_url   = $this->get_package_url( $body, $remote_version );
-
-        if ( empty( $download_url ) ) { set_transient($this->transient_key,array('failed'=>true),300); return false; }
-
-        $repo_url = 'https://github.com/' . $this->repo;
-        $html_url = isset( $body->html_url ) ? $this->sanitize_github_url( (string) $body->html_url, $repo_url . '/' ) : '';
-
-        $release_data = (object) array(
-            'version'      => $remote_version,
-            'download_url' => $download_url,
-            'changelog'    => isset( $body->body ) && is_string( $body->body ) ? $body->body : '',
-            'published_at' => isset( $body->published_at ) && is_string( $body->published_at ) ? $body->published_at : '',
-            'html_url'     => $html_url ?: $repo_url,
-        );
 
         set_transient( $this->transient_key, $release_data, $this->cache_duration );
-
         return $release_data;
     }
 
-    /**
-     * Inject Update Notice into WordPress Update Pipeline
-     */
     public function check_for_update( $transient ) {
-        if ( empty( $transient->checked ) ) {
+        if ( empty( $transient ) || ! is_object( $transient ) || empty( $transient->checked ) ) {
             return $transient;
+        }
+
+        if ( ! isset( $transient->response ) || ! is_array( $transient->response ) ) {
+            $transient->response = array();
+        }
+        if ( ! isset( $transient->no_update ) || ! is_array( $transient->no_update ) ) {
+            $transient->no_update = array();
         }
 
         $release = $this->get_remote_release();
@@ -158,36 +247,31 @@ class FileHub_Updater {
         $local_version = $this->get_local_version();
 
         $obj               = new stdClass();
-        $obj->slug         = dirname( $this->plugin_slug );
-        $obj->plugin       = $this->plugin_slug;
-        $obj->new_version  = $release->version;
+        $obj->id           = $this->plugin_basename;
+        $obj->slug         = $this->slug;
+        $obj->plugin       = $this->plugin_basename;
         $obj->url          = $release->html_url;
         $obj->requires     = $this->requires_wp;
-        $obj->requires_php = $this->requires_php;
         $obj->tested       = $this->tested_up_to;
+        $obj->requires_php = $this->requires_php;
 
         if ( version_compare( $release->version, $local_version, '>' ) ) {
-            $obj->package = $release->download_url;
-            $transient->response[ $this->plugin_slug ] = $obj;
-            if ( isset( $transient->no_update[ $this->plugin_slug ] ) ) {
-                unset( $transient->no_update[ $this->plugin_slug ] );
-            }
+            $obj->new_version                              = $release->version;
+            $obj->package                                  = $release->download_url;
+            $transient->response[ $this->plugin_basename ] = $obj;
+            unset( $transient->no_update[ $this->plugin_basename ] );
         } else {
-            $obj->new_version = $local_version;
-            $obj->package     = '';
-            $transient->no_update[ $this->plugin_slug ] = $obj;
+            $obj->new_version                               = $local_version;
+            $obj->package                                   = '';
+            $transient->no_update[ $this->plugin_basename ] = $obj;
+            unset( $transient->response[ $this->plugin_basename ] );
         }
 
         return $transient;
     }
 
-    /**
-     * Provide Details Popup Info for Plugin Update Screen
-     */
     public function plugin_info( $result, $action, $args ) {
-        $plugin_folder = dirname( $this->plugin_slug );
-
-        if ( 'plugin_information' !== $action || ( !isset($args->slug) || $args->slug !== $plugin_folder ) ) {
+        if ( 'plugin_information' !== $action || ! isset( $args->slug ) || $this->slug !== $args->slug ) {
             return $result;
         }
 
@@ -198,7 +282,7 @@ class FileHub_Updater {
 
         return (object) array(
             'name'          => 'GNN Filehub',
-            'slug'          => $plugin_folder,
+            'slug'          => $this->slug,
             'version'       => $release->version,
             'author'        => 'BigDesigner',
             'homepage'      => 'https://gnn.com.tr',
@@ -214,52 +298,81 @@ class FileHub_Updater {
         );
     }
 
-    /**
-     * Ensure Target Directory Name Consistency After Automatic Update
-     */
-    public function after_install($response,$hook_extra,$result) {
-        if(is_wp_error($response) || ($hook_extra['plugin']??'')!==$this->plugin_slug)return $response;
-        delete_transient($this->transient_key);
+    public function capture_pre_install_state( $response, $hook_extra ) {
+        if ( isset( $hook_extra['plugin'] ) && $hook_extra['plugin'] === $this->plugin_basename ) {
+            if ( ! function_exists( 'is_plugin_active' ) ) {
+                require_once ABSPATH . 'wp-admin/includes/plugin.php';
+            }
+            $this->was_active = is_plugin_active( $this->plugin_basename );
+        }
+
         return $response;
     }
-    public function validate_source($source,$remote_source,$upgrader,$hook_extra) {
-        if(is_wp_error($source) || ($hook_extra['plugin']??'')!==$this->plugin_slug)return $source;
-        global $wp_filesystem;
-        if(!$wp_filesystem || !$wp_filesystem->is_file(trailingslashit($source).'gnn-filehub-nextgen.php') || !$wp_filesystem->is_file(trailingslashit($source).'VERSION'))return new WP_Error('filehub_bad_package',__('Güncelleme paketi geçerli bir FileHub paketi değil.','gnn-filehub'));
-        $expected_folder = dirname( $this->plugin_slug );
-        if ( '.' !== $expected_folder && basename( untrailingslashit( $source ) ) !== $expected_folder ) {
-            $corrected = trailingslashit( $remote_source ) . $expected_folder;
-            if ( $wp_filesystem->move( $source, $corrected, true ) ) {
-                return trailingslashit( $corrected );
-            }
+
+    public function after_install( $response, $hook_extra, $result ) {
+        if ( is_wp_error( $response ) ) {
+            return $response;
         }
-        return $source;
+
+        if ( is_wp_error( $result ) || ! is_array( $result ) ) {
+            return $result;
+        }
+
+        if ( ! isset( $hook_extra['plugin'] ) || $hook_extra['plugin'] !== $this->plugin_basename ) {
+            return $result;
+        }
+
+        global $wp_filesystem;
+        if ( ! $wp_filesystem ) {
+            require_once ABSPATH . 'wp-admin/includes/file.php';
+            WP_Filesystem();
+        }
+
+        $plugin_dir  = wp_normalize_path( untrailingslashit( WP_PLUGIN_DIR . '/' . $this->slug ) );
+        $destination = ! empty( $result['destination'] ) ? wp_normalize_path( untrailingslashit( $result['destination'] ) ) : '';
+
+        if ( '' !== $destination && $destination !== $plugin_dir && $wp_filesystem && $wp_filesystem->exists( $destination ) ) {
+            if ( $wp_filesystem->move( $destination, $plugin_dir, true ) ) {
+                $result['destination']      = trailingslashit( $plugin_dir );
+                $result['destination_name'] = $this->slug;
+            }
+        } elseif ( $destination === $plugin_dir ) {
+            $result['destination']      = trailingslashit( $plugin_dir );
+            $result['destination_name'] = $this->slug;
+        }
+
+        wp_clean_plugins_cache( true );
+
+        if ( $this->was_active ) {
+            activate_plugin( $this->plugin_basename );
+            $this->was_active = false;
+        }
+
+        delete_transient( $this->transient_key );
+
+        return $result;
     }
 
-    /**
-     * Handle Manual Update Check Action
-     */
     public function handle_manual_check() {
         if ( isset( $_GET['filehub_check_update'] ) && '1' === $_GET['filehub_check_update'] ) {
-            if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'filehub_manual_update' ) ) {
-                wp_die( esc_html__( 'Güvenlik doğrulaması başarısız.', 'gnn-filehub' ) );
+            $nonce = isset( $_GET['_wpnonce'] ) ? sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ) : '';
+            if ( ! wp_verify_nonce( $nonce, 'filehub_manual_update' ) || ! current_user_can( 'update_plugins' ) ) {
+                wp_die( esc_html__( 'Güvenlik doğrulaması başarısız.', 'gnn-filehub' ), '', array( 'response' => 403 ) );
             }
 
-            if ( current_user_can( 'update_plugins' ) ) {
-                delete_transient( $this->transient_key );
-                delete_site_transient( 'update_plugins' );
+            delete_transient( $this->transient_key );
+            delete_site_transient( 'update_plugins' );
 
-                wp_safe_redirect( admin_url( 'update-core.php?force-check=1' ) );
-                exit;
-            }
+            wp_safe_redirect( admin_url( 'update-core.php?force-check=1' ) );
+            exit;
         }
     }
 
-    /**
-     * Clear Cache on Core Updates Screen
-     */
     public function clear_cache() {
-        if(!current_user_can('update_plugins'))return;
+        if ( ! current_user_can( 'update_plugins' ) ) {
+            return;
+        }
+
         delete_transient( $this->transient_key );
     }
 }

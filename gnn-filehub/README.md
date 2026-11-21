@@ -1,4 +1,4 @@
-# GNN Filehub 1.7.1
+# GNN Filehub 1.7.2
 
 A WordPress file manager with private local storage, Cloudflare R2 and Google Drive, resumable upload sessions, quotas and member account screens. Production code uses WordPress APIs and vanilla JavaScript without Composer or NPM packages.
 
