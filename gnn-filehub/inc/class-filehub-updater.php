@@ -38,16 +38,22 @@ class FileHub_Updater {
     }
 
     private function get_local_version(): string {
+        $main_file = WP_PLUGIN_DIR . '/' . $this->plugin_basename;
+        if ( file_exists( $main_file ) ) {
+            if ( function_exists( 'clearstatcache' ) ) {
+                clearstatcache( true, $main_file );
+            }
+            $headers = get_file_data( $main_file, array( 'Version' => 'Version' ), 'plugin' );
+            if ( ! empty( $headers['Version'] ) ) {
+                return trim( (string) $headers['Version'] );
+            }
+        }
+
         if ( defined( 'GNN_FILEHUB_VERSION' ) ) {
-            return GNN_FILEHUB_VERSION;
+            return (string) GNN_FILEHUB_VERSION;
         }
 
-        if ( ! function_exists( 'get_plugin_data' ) ) {
-            require_once ABSPATH . 'wp-admin/includes/plugin.php';
-        }
-
-        $plugin_data = get_plugin_data( $this->main_file, false, false );
-        return ! empty( $plugin_data['Version'] ) ? $plugin_data['Version'] : '0.0.0';
+        return '0.0.0';
     }
 
     private function sanitize_github_url( string $url ): string {
